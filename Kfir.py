@@ -36,7 +36,7 @@ st.markdown("""
 
 # --- Constants & Data ---
 SECTORS = {
-    "📊 Overview": [],  # Special case
+    "📊 Overview": [], # Special case
     "💾 Semiconductors": ["NVDA", "AMD", "INTC", "TSM", "AVGO", "QCOM", "MU", "TXN"],
     "🚗 EV & Mobility": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "ON"],
     "☁️ Cloud & SaaS": ["MSFT", "ADBE", "CRM", "SNOW", "DDOG", "NOW", "WDAY", "ZS"],
@@ -56,7 +56,6 @@ SECTORS = {
 
 INDICES = ["^GSPC", "^IXIC", "BTC-USD"]
 
-
 # Helper to flatten list
 def get_all_tickers():
     all_t = []
@@ -64,24 +63,23 @@ def get_all_tickers():
         all_t.extend(s)
     return list(set(all_t + INDICES))
 
-
 # --- Data Fetching ---
-@st.cache_data(ttl=60)  # Cache for 60 seconds to prevent spamming Yahoo
+@st.cache_data(ttl=60) # Cache for 60 seconds to prevent spamming Yahoo
 def fetch_market_data():
     tickers = get_all_tickers()
     if not tickers: return pd.DataFrame(), pd.DataFrame()
-
+    
     # 1. Fetch 5d intraday with prepost for accurate current price
     try:
         live_data = yf.download(
-            tickers,
-            period="5d",
-            interval="15m",
-            prepost=True,
-            group_by='ticker',
-            threads=False,  # Safe mode for web servers
+            tickers, 
+            period="5d", 
+            interval="15m", 
+            prepost=True, 
+            group_by='ticker', 
+            threads=False, # Safe mode for web servers
             progress=False,
-            auto_adjust=False  # Fix FutureWarning
+            auto_adjust=False # Fix FutureWarning
         )
     except Exception as e:
         st.error(f"Error fetching live data: {e}")
@@ -90,18 +88,17 @@ def fetch_market_data():
     # 2. Fetch Daily data for % change calculation reference
     try:
         daily_data = yf.download(
-            tickers,
-            period="1y",
-            group_by='ticker',
-            threads=False,
+            tickers, 
+            period="1y", 
+            group_by='ticker', 
+            threads=False, 
             progress=False,
-            auto_adjust=False  # Fix FutureWarning
+            auto_adjust=False # Fix FutureWarning
         )
     except:
         daily_data = pd.DataFrame()
-
+        
     return live_data, daily_data
-
 
 def calculate_metrics(ticker, live_df, daily_df, timeframe="1D"):
     # Extract specific ticker data
@@ -116,7 +113,7 @@ def calculate_metrics(ticker, live_df, daily_df, timeframe="1D"):
     # Get Current Price (latest from live, or fallback to daily)
     current_price = 0.0
     is_extended = False
-
+    
     if not t_live.empty:
         valid_live = t_live['Close'].dropna()
         if not valid_live.empty:
@@ -127,18 +124,18 @@ def calculate_metrics(ticker, live_df, daily_df, timeframe="1D"):
                 last_dt = last_dt.replace(tzinfo=pytz.timezone('US/Eastern'))
             else:
                 last_dt = last_dt.astimezone(pytz.timezone('US/Eastern'))
-
+            
             h, m = last_dt.hour, last_dt.minute
             if (h < 9) or (h == 9 and m < 30) or (h >= 16):
                 is_extended = True
-
+    
     if current_price == 0 and not t_daily.empty:
         current_price = float(t_daily['Close'].iloc[-1])
 
     # Calculate Change based on Timeframe
     start_price = current_price
     closes = t_daily['Close'].dropna()
-
+    
     if timeframe == "1D":
         # Compare to previous Close
         if len(closes) >= 2:
@@ -148,16 +145,21 @@ def calculate_metrics(ticker, live_df, daily_df, timeframe="1D"):
         lookback_map = {"1W": 5, "1M": 21, "3M": 63, "1Y": 252}
         lb = lookback_map.get(timeframe, 5)
         if len(closes) > lb:
-            start_price = float(closes.iloc[-(lb + 1)])
+            start_price = float(closes.iloc[-(lb+1)])
         elif not closes.empty:
             start_price = float(closes.iloc[0])
 
     change_pct = ((current_price - start_price) / start_price) * 100 if start_price else 0
-
-    # Volume (Approx from daily)
+    
+    # Volume (Approx from daily) - FIXED: Handle NaN values safely
     vol = 0
     if 'Volume' in t_daily.columns:
-        vol = int(t_daily['Volume'].iloc[-1])
+        try:
+            v = t_daily['Volume'].iloc[-1]
+            if pd.notna(v):
+                vol = int(v)
+        except (ValueError, TypeError):
+            vol = 0
 
     return {
         "Ticker": ticker,
@@ -165,16 +167,14 @@ def calculate_metrics(ticker, live_df, daily_df, timeframe="1D"):
         "Change": change_pct,
         "Volume": vol,
         "Extended": is_extended,
-        "History": closes.tolist()[-30:]  # For Sparkline
+        "History": closes.tolist()[-30:] # For Sparkline
     }
 
-
 def format_volume(num):
-    if num > 1_000_000_000: return f"{num / 1_000_000_000:.1f}B"
-    if num > 1_000_000: return f"{num / 1_000_000:.1f}M"
-    if num > 1_000: return f"{num / 1_000:.1f}K"
+    if num > 1_000_000_000: return f"{num/1_000_000_000:.1f}B"
+    if num > 1_000_000: return f"{num/1_000_000:.1f}M"
+    if num > 1_000: return f"{num/1_000:.1f}K"
     return str(num)
-
 
 # --- UI Layout ---
 
@@ -203,11 +203,11 @@ with st.spinner("Fetching global market data..."):
 if selected_sector == "📊 Overview":
     # --- OVERVIEW DASHBOARD ---
     st.subheader("Sector Performance")
-
+    
     sector_stats = []
     for sec_name, tickers in SECTORS.items():
         if sec_name == "📊 Overview": continue
-
+        
         total_change = 0
         count = 0
         for t in tickers:
@@ -215,12 +215,12 @@ if selected_sector == "📊 Overview":
             if m:
                 total_change += m['Change']
                 count += 1
-
+        
         avg = total_change / count if count > 0 else 0
         sector_stats.append({"Sector": sec_name, "Avg Change": avg})
-
+    
     df_overview = pd.DataFrame(sector_stats).sort_values("Avg Change", ascending=False)
-
+    
     st.dataframe(
         df_overview,
         column_config={
@@ -240,34 +240,34 @@ if selected_sector == "📊 Overview":
 else:
     # --- SECTOR DETAIL ---
     tickers = SECTORS[selected_sector]
-
+    
     # Filter/Search
     search_term = st.text_input("Search Ticker", placeholder="e.g. NVDA", label_visibility="collapsed")
-
+    
     rows = []
     for t in tickers:
         if search_term and search_term.upper() not in t: continue
-
+        
         m = calculate_metrics(t, live_data, daily_data, timeframe)
         if m:
             # Add Icons
             icon = "☾" if m['Extended'] else ""
-
+            
             rows.append({
                 "Ticker": f"{t} {icon}",
                 "Price": m['Price'],
-                "Change": m['Change'] / 100,  # Divide by 100 for percentage formatting in dataframe
-                "Volume": m['Volume'],  # Keep raw for sorting
-                "Vol Str": format_volume(m['Volume']),  # Display string
+                "Change": m['Change']/100, # Divide by 100 for percentage formatting in dataframe
+                "Volume": m['Volume'], # Keep raw for sorting
+                "Vol Str": format_volume(m['Volume']), # Display string
                 "Trend": m['History']
             })
-
+            
     df_sector = pd.DataFrame(rows)
-
+    
     if not df_sector.empty:
         # Sort by Performance Descending
         df_sector = df_sector.sort_values("Change", ascending=False)
-
+        
         # Display Table
         st.dataframe(
             df_sector,
@@ -275,7 +275,7 @@ else:
                 "Ticker": st.column_config.TextColumn("Symbol", help="☾ = Extended Hours"),
                 "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
                 "Change": st.column_config.NumberColumn(
-                    "Change",
+                    "Change", 
                     format="%.2f%%"
                 ),
                 "Trend": st.column_config.LineChartColumn(
@@ -283,7 +283,7 @@ else:
                     y_min=0,
                     width="medium"
                 ),
-                "Volume": None,  # Hide raw number
+                "Volume": None, # Hide raw number
                 "Vol Str": st.column_config.TextColumn("Volume")
             },
             hide_index=True,
