@@ -76,47 +76,79 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Constants & High Impact Stocks ---
-# Curated list of high-impact stocks per sector
+# Curated list of high-impact stocks per sector (Comprehensive Expansion)
 SECTORS = {
-    "Semiconductors": ["NVDA", "TSM", "AVGO", "AMD", "QCOM", "TXN", "MU", "INTC", "ARM", "AMAT"],
-    "Tech Giants & SaaS": ["MSFT", "AAPL", "ADBE", "CRM", "ORCL", "NOW", "UBER", "CSCO", "IBM", "INTU"],
-    "EV & Mobility": ["TSLA", "TM", "RIVN", "ON", "LCID", "F", "GM", "HMC", "STLA", "LI"],
-    "Cybersecurity": ["PANW", "CRWD", "FTNT", "PLTR", "OKTA", "NET", "ZS", "CYBR", "GEN", "TENB"],
-    "E-Commerce & Retail": ["AMZN", "WMT", "HD", "COST", "BABA", "PDD", "JD", "SHOP", "TGT", "LOW"],
-    "Biotech & Pharma": ["LLY", "JNJ", "ABBV", "MRK", "NVO", "PFE", "AMGN", "VRTX", "GILD", "BMY"],
-    "Fintech & Finance": ["JPM", "V", "MA", "BRK-B", "BAC", "WFC", "MS", "GS", "AXP", "PYPL"],
-    "Energy & Clean Tech": ["XOM", "CVX", "SHEL", "TTE", "COP", "BP", "SLB", "EOG", "OXY", "FSLR"],
-    "Media & Streaming": ["NFLX", "DIS", "GOOGL", "META", "CMCSA", "TMUS", "VZ", "T", "SPOT", "WBD"],
-    "Travel & Leisure": ["BKNG", "ABNB", "MAR", "HLT", "DAL", "UAL", "RCL", "CCL", "LUV", "EXPE"]
+    "Magnificent 7 & Big Tech": ["MSFT", "AAPL", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "ORCL", "IBM", "CSCO"],
+    "Semiconductors": ["TSM", "AVGO", "AMD", "QCOM", "TXN", "MU", "INTC", "ARM", "AMAT", "LRCX", "ADI"],
+    "Software (SaaS) & Cloud": ["CRM", "NOW", "ADBE", "SNOW", "DDOG", "PLTR", "MDB", "ZS", "NET", "WDAY", "HUBS", "TEAM"],
+    "Cybersecurity": ["PANW", "CRWD", "FTNT", "OKTA", "CYBR", "GEN", "TENB", "S", "CHKP"],
+    "Fintech & Payments": ["V", "MA", "PYPL", "SQ", "COIN", "HOOD", "AFRM", "FI", "FIS", "GPN", "TOST"],
+    "Banking & Finance": ["JPM", "BAC", "WFC", "C", "MS", "GS", "SCHW", "BLK", "AXP", "USB", "PNC"],
+    "Healthcare & Pharma": ["LLY", "JNJ", "ABBV", "MRK", "PFE", "AMGN", "BMY", "GILD", "VRTX", "REGN", "NVO"],
+    "MedTech & Devices": ["TMO", "ABT", "MDT", "ISRG", "SYK", "BSX", "EW", "DXCM", "ZBH", "BDX", "GEHC"],
+    "Consumer Discretionary": ["HD", "MCD", "NKE", "SBUX", "TGT", "LOW", "TJX", "LULU", "CMG", "YUM", "EBAY"],
+    "Consumer Staples": ["WMT", "COST", "PG", "KO", "PEP", "PM", "MO", "CL", "EL", "K", "GIS", "MNST"],
+    "Automotive & EV": ["TM", "F", "GM", "HMC", "STLA", "RIVN", "LCID", "LI", "NIO", "XPEV"],
+    "Aerospace & Defense": ["RTX", "LMT", "BA", "NOC", "GD", "LHX", "GE", "TDG", "AXON", "HII"],
+    "Industrials & Logistics": ["CAT", "DE", "UNP", "UPS", "HON", "ETN", "ITW", "WM", "MMM", "FDX", "CSX"],
+    "Energy (Oil & Gas)": ["XOM", "CVX", "SHEL", "TTE", "COP", "BP", "SLB", "EOG", "OXY", "MPC", "VLO"],
+    "Clean Tech & Utilities": ["NEE", "DU", "SO", "AEP", "SRE", "D", "PEG", "FSLR", "ENPH", "SEDG", "PLUG"],
+    "Materials & Mining": ["LIN", "SCCO", "FCX", "NEM", "SHW", "APD", "DD", "CTVA", "ALB", "NUE", "DOW"],
+    "Real Estate (REITs)": ["PLD", "AMT", "EQIX", "CCI", "O", "SPG", "PSA", "WELL", "DLR", "VICI"],
+    "Media & Telecom": ["NFLX", "DIS", "TMUS", "VZ", "T", "CMCSA", "CHTR", "WBD", "SPOT", "LYV", "PARA"],
+    "Travel & Leisure": ["BKNG", "ABNB", "MAR", "HLT", "DAL", "UAL", "RCL", "CCL", "LUV", "EXPE", "LVS"]
 }
 
-# Mapping for nicer display names
+# Mapping for nicer display names (Expanded)
 COMPANY_NAMES = {
-    "NVDA": "NVIDIA", "TSM": "TSMC", "AVGO": "Broadcom", "AMD": "Adv. Micro Devices", 
-    "QCOM": "Qualcomm", "TXN": "Texas Instruments", "MU": "Micron", "INTC": "Intel",
-    "ARM": "Arm Holdings", "AMAT": "Applied Materials", "MSFT": "Microsoft", "AAPL": "Apple",
-    "ADBE": "Adobe", "CRM": "Salesforce", "ORCL": "Oracle", "NOW": "ServiceNow",
-    "UBER": "Uber", "CSCO": "Cisco", "IBM": "IBM", "INTU": "Intuit",
-    "TSLA": "Tesla", "TM": "Toyota", "RIVN": "Rivian", "ON": "ON Semi",
-    "LCID": "Lucid", "F": "Ford", "GM": "General Motors", "HMC": "Honda",
-    "STLA": "Stellantis", "LI": "Li Auto", "PANW": "Palo Alto Net", "CRWD": "CrowdStrike",
-    "FTNT": "Fortinet", "PLTR": "Palantir", "OKTA": "Okta", "NET": "Cloudflare",
-    "ZS": "Zscaler", "CYBR": "CyberArk", "GEN": "Gen Digital", "TENB": "Tenable",
-    "AMZN": "Amazon", "WMT": "Walmart", "HD": "Home Depot", "COST": "Costco",
-    "BABA": "Alibaba", "PDD": "PDD Holdings", "JD": "JD.com", "SHOP": "Shopify",
-    "TGT": "Target", "LOW": "Lowe's", "LLY": "Eli Lilly", "JNJ": "Johnson & Johnson",
-    "ABBV": "AbbVie", "MRK": "Merck", "NVO": "Novo Nordisk", "PFE": "Pfizer",
-    "AMGN": "Amgen", "VRTX": "Vertex", "GILD": "Gilead", "BMY": "Bristol-Myers",
-    "JPM": "JPMorgan", "V": "Visa", "MA": "Mastercard", "BRK-B": "Berkshire Hathaway",
-    "BAC": "Bank of America", "WFC": "Wells Fargo", "MS": "Morgan Stanley", "GS": "Goldman Sachs",
-    "AXP": "Amex", "PYPL": "PayPal", "XOM": "ExxonMobil", "CVX": "Chevron",
-    "SHEL": "Shell", "TTE": "TotalEnergies", "COP": "ConocoPhillips", "BP": "BP plc",
-    "SLB": "Schlumberger", "EOG": "EOG Resources", "OXY": "Occidental", "FSLR": "First Solar",
-    "NFLX": "Netflix", "DIS": "Disney", "GOOGL": "Alphabet (Google)", "META": "Meta",
-    "CMCSA": "Comcast", "TMUS": "T-Mobile", "VZ": "Verizon", "T": "AT&T",
-    "SPOT": "Spotify", "WBD": "Warner Bros", "BKNG": "Booking Holdings", "ABNB": "Airbnb",
-    "MAR": "Marriott", "HLT": "Hilton", "DAL": "Delta Air", "UAL": "United Airlines",
-    "RCL": "Royal Caribbean", "CCL": "Carnival", "LUV": "Southwest", "EXPE": "Expedia"
+    # Tech & Semi
+    "NVDA": "NVIDIA", "TSM": "TSMC", "AVGO": "Broadcom", "AMD": "Adv. Micro Devices", "QCOM": "Qualcomm", "TXN": "Texas Instruments", 
+    "MU": "Micron", "INTC": "Intel", "ARM": "Arm Holdings", "AMAT": "Applied Materials", "LRCX": "Lam Research", "ADI": "Analog Devices",
+    "MSFT": "Microsoft", "AAPL": "Apple", "GOOGL": "Alphabet", "META": "Meta", "AMZN": "Amazon", "TSLA": "Tesla", 
+    "ORCL": "Oracle", "IBM": "IBM", "CSCO": "Cisco", "CRM": "Salesforce", "NOW": "ServiceNow", "ADBE": "Adobe", 
+    "SNOW": "Snowflake", "DDOG": "Datadog", "PLTR": "Palantir", "MDB": "MongoDB", "ZS": "Zscaler", "NET": "Cloudflare", 
+    "WDAY": "Workday", "HUBS": "HubSpot", "TEAM": "Atlassian",
+    # Cyber
+    "PANW": "Palo Alto Net", "CRWD": "CrowdStrike", "FTNT": "Fortinet", "OKTA": "Okta", "CYBR": "CyberArk", "GEN": "Gen Digital", 
+    "TENB": "Tenable", "S": "SentinelOne", "CHKP": "Check Point",
+    # Finance
+    "V": "Visa", "MA": "Mastercard", "PYPL": "PayPal", "SQ": "Block", "COIN": "Coinbase", "HOOD": "Robinhood", "AFRM": "Affirm", 
+    "FI": "Fiserv", "FIS": "Fidelity National", "GPN": "Global Payments", "TOST": "Toast",
+    "JPM": "JPMorgan", "BAC": "Bank of America", "WFC": "Wells Fargo", "C": "Citigroup", "MS": "Morgan Stanley", "GS": "Goldman Sachs", 
+    "SCHW": "Charles Schwab", "BLK": "BlackRock", "AXP": "Amex", "USB": "US Bancorp", "PNC": "PNC Financial",
+    # Health
+    "LLY": "Eli Lilly", "JNJ": "Johnson & Johnson", "ABBV": "AbbVie", "MRK": "Merck", "PFE": "Pfizer", "AMGN": "Amgen", 
+    "BMY": "Bristol-Myers", "GILD": "Gilead", "VRTX": "Vertex", "REGN": "Regeneron", "NVO": "Novo Nordisk",
+    "TMO": "Thermo Fisher", "ABT": "Abbott", "MDT": "Medtronic", "ISRG": "Intuitive Surgical", "SYK": "Stryker", "BSX": "Boston Scientific", 
+    "EW": "Edwards Lifesciences", "DXCM": "Dexcom", "ZBH": "Zimmer Biomet", "BDX": "Becton Dickinson", "GEHC": "GE HealthCare",
+    # Consumer
+    "HD": "Home Depot", "MCD": "McDonald's", "NKE": "Nike", "SBUX": "Starbucks", "TGT": "Target", "LOW": "Lowe's", 
+    "TJX": "TJX Companies", "LULU": "Lululemon", "CMG": "Chipotle", "YUM": "Yum! Brands", "EBAY": "eBay",
+    "WMT": "Walmart", "COST": "Costco", "PG": "Procter & Gamble", "KO": "Coca-Cola", "PEP": "PepsiCo", "PM": "Philip Morris", 
+    "MO": "Altria", "CL": "Colgate-Palmolive", "EL": "Estee Lauder", "K": "Kellanova", "GIS": "General Mills", "MNST": "Monster Bev",
+    # Auto
+    "TM": "Toyota", "F": "Ford", "GM": "General Motors", "HMC": "Honda", "STLA": "Stellantis", "RIVN": "Rivian", 
+    "LCID": "Lucid", "LI": "Li Auto", "NIO": "NIO", "XPEV": "XPeng",
+    # Industrial & Defense
+    "RTX": "RTX Corp", "LMT": "Lockheed Martin", "BA": "Boeing", "NOC": "Northrop Grumman", "GD": "General Dynamics", 
+    "LHX": "L3Harris", "GE": "GE Aerospace", "TDG": "TransDigm", "AXON": "Axon", "HII": "Huntington Ingalls",
+    "CAT": "Caterpillar", "DE": "Deere", "UNP": "Union Pacific", "UPS": "UPS", "HON": "Honeywell", "ETN": "Eaton", 
+    "ITW": "Illinois Tool Works", "WM": "Waste Management", "MMM": "3M", "FDX": "FedEx", "CSX": "CSX Corp",
+    # Energy & Materials
+    "XOM": "ExxonMobil", "CVX": "Chevron", "SHEL": "Shell", "TTE": "TotalEnergies", "COP": "ConocoPhillips", "BP": "BP plc", 
+    "SLB": "Schlumberger", "EOG": "EOG Resources", "OXY": "Occidental", "MPC": "Marathon Petroleum", "VLO": "Valero",
+    "NEE": "NextEra Energy", "DU": "Duke Energy", "SO": "Southern Co", "AEP": "American Elec", "SRE": "Sempra", "D": "Dominion", 
+    "PEG": "PSEG", "FSLR": "First Solar", "ENPH": "Enphase", "SEDG": "SolarEdge", "PLUG": "Plug Power",
+    "LIN": "Linde", "SCCO": "Southern Copper", "FCX": "Freeport-McMoRan", "NEM": "Newmont", "SHW": "Sherwin-Williams", 
+    "APD": "Air Products", "DD": "DuPont", "CTVA": "Corteva", "ALB": "Albemarle", "NUE": "Nucor", "DOW": "Dow Inc",
+    # Real Estate
+    "PLD": "Prologis", "AMT": "American Tower", "EQIX": "Equinix", "CCI": "Crown Castle", "O": "Realty Income", 
+    "SPG": "Simon Property", "PSA": "Public Storage", "WELL": "Welltower", "DLR": "Digital Realty", "VICI": "VICI Properties",
+    # Media & Leisure
+    "NFLX": "Netflix", "DIS": "Disney", "TMUS": "T-Mobile", "VZ": "Verizon", "T": "AT&T", "CMCSA": "Comcast", "CHTR": "Charter", 
+    "WBD": "Warner Bros", "SPOT": "Spotify", "LYV": "Live Nation", "PARA": "Paramount",
+    "BKNG": "Booking Holdings", "ABNB": "Airbnb", "MAR": "Marriott", "HLT": "Hilton", "DAL": "Delta Air", "UAL": "United Airlines", 
+    "RCL": "Royal Caribbean", "CCL": "Carnival", "LUV": "Southwest", "EXPE": "Expedia", "LVS": "Las Vegas Sands"
 }
 
 # Flatten list for batch fetching
@@ -256,25 +288,30 @@ with tab_overview:
     if not df_overview.empty:
         df_overview = df_overview.sort_values("Daily", ascending=False)
         
+        # Apply Pandas Styling for diverging bars (Green/Red)
+        # Note: We use a Styler object to achieve the 'split' bar visualization
+        styler_overview = df_overview.style.format({
+            "Daily": "{:+.2%}",
+            "YTD": "{:+.2%}"
+        }).bar(
+            subset=["Daily"],
+            align=0,  # Align bars at 0 (center)
+            color=['#FF4B4B', '#4CAF50'],  # [Negative(Red), Positive(Green)]
+            vmin=-0.05,
+            vmax=0.05
+        )
+
         st.dataframe(
-            df_overview,
+            styler_overview,
             column_config={
                 "Theme / Sector": st.column_config.TextColumn("Theme / Sector", width="large"),
-                "Daily": st.column_config.ProgressColumn(
-                    "Daily Performance",
-                    format="%.2f%%",
-                    min_value=-0.05,
-                    max_value=0.05,
-                ),
-                "YTD": st.column_config.NumberColumn(
-                    "YTD Return",
-                    format="%.2f%%"
-                ),
+                "Daily": st.column_config.NumberColumn("Daily Performance"),
+                "YTD": st.column_config.NumberColumn("YTD Return"),
                 "Count": st.column_config.NumberColumn("Tickers", format="%d")
             },
             hide_index=True,
             width="stretch",
-            height=600
+            height=800
         )
 
 # --- TAB 2: SECTOR DETAIL ---
@@ -336,17 +373,32 @@ with tab_detail:
             # User can sort by any column, default to 1D perf
             df_detail = df_detail.sort_values("1D %", ascending=False)
             
+            # Apply styling to detail view as well for 1D %
+            styler_detail = df_detail.style.format({
+                "1D %": "{:+.2%}",
+                "1W %": "{:+.2%}",
+                "1M %": "{:+.2%}",
+                "YTD %": "{:+.2%}",
+                "Price": "${:.2f}"
+            }).bar(
+                subset=["1D %"],
+                align=0,
+                color=['#FF4B4B', '#4CAF50'],
+                vmin=-0.05,
+                vmax=0.05
+            )
+
             st.dataframe(
-                df_detail,
+                styler_detail,
                 column_config={
                     "Logo": st.column_config.ImageColumn("Logo", width="small"),
                     "Symbol": st.column_config.TextColumn("Symbol", width="small"),
                     "Name": st.column_config.TextColumn("Company Name", width="medium"),
-                    "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
-                    "1D %": st.column_config.NumberColumn("1 Day", format="%.2f%%"),
-                    "1W %": st.column_config.NumberColumn("1 Week", format="%.2f%%"),
-                    "1M %": st.column_config.NumberColumn("1 Month", format="%.2f%%"),
-                    "YTD %": st.column_config.NumberColumn("YTD", format="%.2f%%"),
+                    "Price": st.column_config.NumberColumn("Price"),
+                    "1D %": st.column_config.NumberColumn("1 Day"),
+                    "1W %": st.column_config.NumberColumn("1 Week"),
+                    "1M %": st.column_config.NumberColumn("1 Month"),
+                    "YTD %": st.column_config.NumberColumn("YTD"),
                 },
                 hide_index=True,
                 width="stretch",
