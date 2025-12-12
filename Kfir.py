@@ -66,6 +66,15 @@ st.markdown("""
         color: white;
         border-color: #4CAF50;
     }
+    
+    /* Card Styling for Overview Rows */
+    .sector-row {
+        background-color: #1E1E24;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        border-left: 5px solid #4CAF50;
+    }
 
     /* Remove standard padding */
     .block-container {
@@ -239,6 +248,11 @@ if 'selected_sector' not in st.session_state:
 if 'active_tab' not in st.session_state:
     st.session_state.active_tab = "Overview"
 
+# Function to switch tab (simulated by updating state and rerun)
+def switch_to_detail(sector_name):
+    st.session_state.selected_sector = sector_name
+    st.session_state.active_tab = "Sector Detail"
+
 # Header
 col_header, col_btn = st.columns([6, 1])
 with col_header:
@@ -260,100 +274,86 @@ if live_data.empty:
     st.error("Failed to load data. Please refresh.")
     st.stop()
 
-# Tabs
-tab_overview, tab_detail = st.tabs(["Overview", "Sector Detail"])
+# Layout: Simple Tab switch logic using radio or internal buttons if st.tabs is restrictive
+# Note: st.tabs does not support programmatic switching easily in all versions. 
+# We will use st.tabs but rely on user clicking them, OR strictly use state to render content.
+# Given the requirement for "Button moves you to page", we will use conditional rendering based on state.
 
-# --- TAB 1: OVERVIEW ---
-with tab_overview:
-    sector_summary = []
+# Navigation Bar
+nav_col1, nav_col2 = st.columns([1,1])
+with nav_col1:
+    if st.button("🏠 Overview", use_container_width=True, type="primary" if st.session_state.active_tab == "Overview" else "secondary"):
+        st.session_state.active_tab = "Overview"
+        st.rerun()
+with nav_col2:
+    if st.button("📊 Sector Detail", use_container_width=True, type="primary" if st.session_state.active_tab == "Sector Detail" else "secondary"):
+        st.session_state.active_tab = "Sector Detail"
+        st.rerun()
+
+st.markdown("---")
+
+# --- VIEW 1: OVERVIEW (CARD GRID) ---
+if st.session_state.active_tab == "Overview":
+    st.subheader("Market Sectors Overview")
+    
+    # Calculate all metrics first to sort them? Or just display.
+    # Let's display them in a grid.
+    
+    # Sort sectors by performance? Optional. For now, alphabetical/defined order.
     
     for sec_name, sec_tickers in SECTORS.items():
+        # Calculate Sector Aggregates
         total_change_1d = 0
-        total_change_ytd = 0
         count = 0
-        
         for t in sec_tickers:
             m = get_detailed_metrics(t, live_data)
             if m:
                 total_change_1d += m['1d']
-                total_change_ytd += m['ytd']
                 count += 1
         
-        if count > 0:
-            avg_1d = total_change_1d / count
-            avg_ytd = total_change_ytd / count
-            sector_summary.append({
-                "Theme / Sector": sec_name,
-                "Daily": avg_1d,
-                "YTD": avg_ytd,
-                "Count": count
-            })
-    
-    df_overview = pd.DataFrame(sector_summary)
-    
-    if not df_overview.empty:
-        df_overview = df_overview.sort_values("Daily", ascending=False)
+        avg_1d = total_change_1d / count if count > 0 else 0.0
         
-        # --- SELECTION & NAVIGATION ---
-        # Display clickable button for navigation
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            st.info("👇 Select a sector below to see the 'Go to Detail' button.")
+        # Color for the border or text
+        color_hex = "#4CAF50" if avg_1d >= 0 else "#FF4B4B"
         
-        # Apply Pandas Styling
-        styler_overview = df_overview.style.format({
-            "Daily": "{:+.2%}",
-            "YTD": "{:+.2%}"
-        }).bar(
-            subset=["Daily"],
-            align=0,
-            color=['#FF4B4B', '#4CAF50'],
-            vmin=-0.05,
-            vmax=0.05
-        )
-
-        # Interactive Dataframe
-        event = st.dataframe(
-            styler_overview,
-            column_config={
-                "Theme / Sector": st.column_config.TextColumn("Theme / Sector", width="large"),
-                "Daily": st.column_config.Column("Daily Performance"), # Use generic Column to avoid overriding Styler
-                "YTD": st.column_config.NumberColumn("YTD Return"),
-                "Count": st.column_config.NumberColumn("Tickers", format="%d")
-            },
-            hide_index=True,
-            width="stretch",
-            height=600,
-            on_select="rerun",
-            selection_mode="single-row"
-        )
-        
-        # Handle Selection Button
-        if len(event.selection.rows) > 0:
-            selected_row_idx = event.selection.rows[0]
-            new_sector = df_overview.iloc[selected_row_idx]["Theme / Sector"]
+        # Create a container "Card"
+        with st.container():
+            st.markdown(f"""
+            <div style="background-color: #1E1E24; padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 5px solid {color_hex}; display: flex; align-items: center; justify-content: space-between;">
+                <div style="flex: 2;">
+                    <h3 style="margin: 0; font-size: 1.2rem;">{sec_name}</h3>
+                    <span style="color: #8b949e; font-size: 0.9rem;">{count} Stocks Tracked</span>
+                </div>
+                <div style="flex: 1; text-align: center;">
+                    <span style="font-size: 1.5rem; font-weight: bold; color: {color_hex};">{avg_1d:+.2%}</span>
+                    <br><span style="font-size: 0.8rem; color: #8b949e;">Daily Avg</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
             
-            # Update state immediately
-            st.session_state.selected_sector = new_sector
+            # The "Real Button" to navigate
+            # We use a unique key for each button
+            if st.button(f"View {sec_name} Details ➔", key=f"btn_{sec_name}", use_container_width=True):
+                switch_to_detail(sec_name)
+                st.rerun()
             
-            # Show a prominent button to jump
-            with c2:
-                if st.button(f"🔍 View Top 10 for {new_sector}", type="primary"):
-                    # Switch tab is tricky in Streamlit purely programmatically without extra components,
-                    # so we instruct user or use a visual cue.
-                    st.toast(f"Switched to {new_sector} details! Please click the 'Sector Detail' tab.", icon="🚀")
+            st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
-# --- TAB 2: SECTOR DETAIL ---
-with tab_detail:
-    # Determine index based on session state
-    try:
-        current_sector_idx = list(SECTORS.keys()).index(st.session_state.selected_sector)
-    except ValueError:
-        current_sector_idx = 0
 
+# --- VIEW 2: SECTOR DETAIL ---
+elif st.session_state.active_tab == "Sector Detail":
+    
+    # Back button logic handled by top nav, but good to have context
+    
     # Controls
     col_sel, col_tf, col_limit, col_blank = st.columns([2, 1, 1, 1])
     with col_sel:
+        # Determine index based on session state
+        try:
+            current_sector_idx = list(SECTORS.keys()).index(st.session_state.selected_sector)
+        except ValueError:
+            current_sector_idx = 0
+            
         selected_sector = st.selectbox(
             "Select Sector", 
             list(SECTORS.keys()), 
@@ -372,6 +372,8 @@ with tab_detail:
         selected_tf_col = timeframe_options[selected_tf_label]
 
     with col_limit:
+        st.write("") # Align checkbox
+        st.write("")
         show_top_10 = st.checkbox("Show Top 10 Only", value=True)
 
     if selected_sector:
@@ -424,7 +426,11 @@ with tab_detail:
             if show_top_10:
                 df_detail = df_detail.head(10)
             
-            # Apply styling to detail view
+            # --- DIVERGING BARS FIX ---
+            # We strictly separate Styler from Column Config.
+            # Styler handles the color bars.
+            # Column Config handles the Image, Text, and basic numbers (Price).
+            
             styler_detail = df_detail.style.format({
                 "1D %": "{:+.2%}",
                 "1W %": "{:+.2%}",
@@ -434,7 +440,7 @@ with tab_detail:
             }).bar(
                 subset=[selected_tf_col], # Dynamic column based on user selection
                 align=0,
-                color=['#FF4B4B', '#4CAF50'],
+                color=['#FF4B4B', '#4CAF50'], # Red for Neg, Green for Pos
                 vmin=-0.05,
                 vmax=0.05
             )
@@ -446,11 +452,7 @@ with tab_detail:
                     "Symbol": st.column_config.TextColumn("Symbol", width="small"),
                     "Name": st.column_config.TextColumn("Company Name", width="medium"),
                     "Price": st.column_config.NumberColumn("Price"),
-                    # Generic Column config avoids overriding the Pandas Styler colors
-                    "1D %": st.column_config.Column("1 Day"),
-                    "1W %": st.column_config.Column("1 Week"),
-                    "1M %": st.column_config.Column("1 Month"),
-                    "YTD %": st.column_config.Column("YTD"),
+                    # IMPORTANT: We DO NOT configure the % columns here to avoid overriding the Styler.
                 },
                 hide_index=True,
                 width="stretch",
