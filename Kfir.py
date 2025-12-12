@@ -55,6 +55,18 @@ st.markdown("""
         color: #8b949e;
     }
 
+    /* Refresh Button Styling */
+    div.stButton > button {
+        background-color: #262730;
+        color: white;
+        border: 1px solid #4CAF50;
+    }
+    div.stButton > button:hover {
+        background-color: #4CAF50;
+        color: white;
+        border-color: #4CAF50;
+    }
+
     /* Remove standard padding */
     .block-container {
         padding-top: 2rem;
@@ -111,7 +123,7 @@ COMPANY_NAMES = {
 ALL_TICKERS = list(set([t for s in SECTORS.values() for t in s]))
 
 # --- Data Engine ---
-@st.cache_data(ttl=3600)  # Cache for 1 hour
+@st.cache_data(ttl=900)  # Cache for 15 minutes (900s) to avoid rate limits
 def fetch_data():
     """Fetches 1y data to calculate multiple timeframes."""
     try:
@@ -189,7 +201,17 @@ def get_detailed_metrics(ticker, live_df):
 
 # --- Main UI ---
 
-st.title("Theme Tracker Pro")
+# Header with Refresh Button
+col_header, col_btn = st.columns([6, 1])
+with col_header:
+    st.title("Theme Tracker Pro")
+    st.caption(f"Last updated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+with col_btn:
+    st.write("") # Spacer
+    if st.button("🔄 Refresh Data"):
+        st.cache_data.clear()
+        st.rerun()
+
 st.markdown("---")
 
 # Data Loading
