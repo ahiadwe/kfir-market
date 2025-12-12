@@ -2,13 +2,14 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import datetime
+import altair as alt
 
 # --- Configuration ---
 st.set_page_config(
     page_title="Theme Tracker Pro",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # --- Custom CSS (Clean Dark Theme) ---
@@ -26,25 +27,6 @@ st.markdown("""
         border-radius: 8px;
         padding: 10px;
     }
-
-    /* Tabs Styling */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 20px;
-        background-color: transparent;
-    }
-    .stTabs [data-baseweb="tab"] {
-        background-color: transparent;
-        color: #8b949e;
-        font-weight: 600;
-        padding-bottom: 10px;
-    }
-    .stTabs [data-baseweb="tab"]:hover {
-        color: white;
-    }
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        color: #4CAF50; /* Green highlight */
-        border-bottom: 2px solid #4CAF50;
-    }
     
     /* Metrics Styling */
     div[data-testid="stMetricValue"] {
@@ -55,27 +37,6 @@ st.markdown("""
         color: #8b949e;
     }
 
-    /* Refresh Button Styling */
-    div.stButton > button {
-        background-color: #262730;
-        color: white;
-        border: 1px solid #4CAF50;
-    }
-    div.stButton > button:hover {
-        background-color: #4CAF50;
-        color: white;
-        border-color: #4CAF50;
-    }
-    
-    /* Card Styling for Overview Rows */
-    .sector-row {
-        background-color: #1E1E24;
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 10px;
-        border-left: 5px solid #4CAF50;
-    }
-
     /* Remove standard padding */
     .block-container {
         padding-top: 2rem;
@@ -84,93 +45,31 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- Constants & High Impact Stocks ---
-# Curated list of high-impact stocks per sector (Comprehensive Expansion)
-SECTORS = {
-    "Magnificent 7 & Big Tech": ["MSFT", "AAPL", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "ORCL", "IBM", "CSCO"],
-    "Semiconductors": ["TSM", "AVGO", "AMD", "QCOM", "TXN", "MU", "INTC", "ARM", "AMAT", "LRCX", "ADI"],
-    "Software (SaaS) & Cloud": ["CRM", "NOW", "ADBE", "SNOW", "DDOG", "PLTR", "MDB", "ZS", "NET", "WDAY", "HUBS", "TEAM"],
-    "Cybersecurity": ["PANW", "CRWD", "FTNT", "OKTA", "CYBR", "GEN", "TENB", "S", "CHKP"],
-    "Fintech & Payments": ["V", "MA", "PYPL", "SQ", "COIN", "HOOD", "AFRM", "FI", "FIS", "GPN", "TOST"],
-    "Banking & Finance": ["JPM", "BAC", "WFC", "C", "MS", "GS", "SCHW", "BLK", "AXP", "USB", "PNC"],
-    "Healthcare & Pharma": ["LLY", "JNJ", "ABBV", "MRK", "PFE", "AMGN", "BMY", "GILD", "VRTX", "REGN", "NVO"],
-    "MedTech & Devices": ["TMO", "ABT", "MDT", "ISRG", "SYK", "BSX", "EW", "DXCM", "ZBH", "BDX", "GEHC"],
-    "Consumer Discretionary": ["HD", "MCD", "NKE", "SBUX", "TGT", "LOW", "TJX", "LULU", "CMG", "YUM", "EBAY"],
-    "Consumer Staples": ["WMT", "COST", "PG", "KO", "PEP", "PM", "MO", "CL", "EL", "K", "GIS", "MNST"],
-    "Automotive & EV": ["TM", "F", "GM", "HMC", "STLA", "RIVN", "LCID", "LI", "NIO", "XPEV"],
-    "Aerospace & Defense": ["RTX", "LMT", "BA", "NOC", "GD", "LHX", "GE", "TDG", "AXON", "HII"],
-    "Industrials & Logistics": ["CAT", "DE", "UNP", "UPS", "HON", "ETN", "ITW", "WM", "MMM", "FDX", "CSX"],
-    "Energy (Oil & Gas)": ["XOM", "CVX", "SHEL", "TTE", "COP", "BP", "SLB", "EOG", "OXY", "MPC", "VLO"],
-    "Clean Tech & Utilities": ["NEE", "DU", "SO", "AEP", "SRE", "D", "PEG", "FSLR", "ENPH", "SEDG", "PLUG"],
-    "Materials & Mining": ["LIN", "SCCO", "FCX", "NEM", "SHW", "APD", "DD", "CTVA", "ALB", "NUE", "DOW"],
-    "Real Estate (REITs)": ["PLD", "AMT", "EQIX", "CCI", "O", "SPG", "PSA", "WELL", "DLR", "VICI"],
-    "Media & Telecom": ["NFLX", "DIS", "TMUS", "VZ", "T", "CMCSA", "CHTR", "WBD", "SPOT", "LYV", "PARA"],
-    "Travel & Leisure": ["BKNG", "ABNB", "MAR", "HLT", "DAL", "UAL", "RCL", "CCL", "LUV", "EXPE", "LVS"]
-}
+# --- Data Engine: Dynamic Fetching ---
 
-# Mapping for nicer display names (Expanded)
-COMPANY_NAMES = {
-    # Tech & Semi
-    "NVDA": "NVIDIA", "TSM": "TSMC", "AVGO": "Broadcom", "AMD": "Adv. Micro Devices", "QCOM": "Qualcomm", "TXN": "Texas Instruments", 
-    "MU": "Micron", "INTC": "Intel", "ARM": "Arm Holdings", "AMAT": "Applied Materials", "LRCX": "Lam Research", "ADI": "Analog Devices",
-    "MSFT": "Microsoft", "AAPL": "Apple", "GOOGL": "Alphabet", "META": "Meta", "AMZN": "Amazon", "TSLA": "Tesla", 
-    "ORCL": "Oracle", "IBM": "IBM", "CSCO": "Cisco", "CRM": "Salesforce", "NOW": "ServiceNow", "ADBE": "Adobe", 
-    "SNOW": "Snowflake", "DDOG": "Datadog", "PLTR": "Palantir", "MDB": "MongoDB", "ZS": "Zscaler", "NET": "Cloudflare", 
-    "WDAY": "Workday", "HUBS": "HubSpot", "TEAM": "Atlassian",
-    # Cyber
-    "PANW": "Palo Alto Net", "CRWD": "CrowdStrike", "FTNT": "Fortinet", "OKTA": "Okta", "CYBR": "CyberArk", "GEN": "Gen Digital", 
-    "TENB": "Tenable", "S": "SentinelOne", "CHKP": "Check Point",
-    # Finance
-    "V": "Visa", "MA": "Mastercard", "PYPL": "PayPal", "SQ": "Block", "COIN": "Coinbase", "HOOD": "Robinhood", "AFRM": "Affirm", 
-    "FI": "Fiserv", "FIS": "Fidelity National", "GPN": "Global Payments", "TOST": "Toast",
-    "JPM": "JPMorgan", "BAC": "Bank of America", "WFC": "Wells Fargo", "C": "Citigroup", "MS": "Morgan Stanley", "GS": "Goldman Sachs", 
-    "SCHW": "Charles Schwab", "BLK": "BlackRock", "AXP": "Amex", "USB": "US Bancorp", "PNC": "PNC Financial",
-    # Health
-    "LLY": "Eli Lilly", "JNJ": "Johnson & Johnson", "ABBV": "AbbVie", "MRK": "Merck", "PFE": "Pfizer", "AMGN": "Amgen", 
-    "BMY": "Bristol-Myers", "GILD": "Gilead", "VRTX": "Vertex", "REGN": "Regeneron", "NVO": "Novo Nordisk",
-    "TMO": "Thermo Fisher", "ABT": "Abbott", "MDT": "Medtronic", "ISRG": "Intuitive Surgical", "SYK": "Stryker", "BSX": "Boston Scientific", 
-    "EW": "Edwards Lifesciences", "DXCM": "Dexcom", "ZBH": "Zimmer Biomet", "BDX": "Becton Dickinson", "GEHC": "GE HealthCare",
-    # Consumer
-    "HD": "Home Depot", "MCD": "McDonald's", "NKE": "Nike", "SBUX": "Starbucks", "TGT": "Target", "LOW": "Lowe's", 
-    "TJX": "TJX Companies", "LULU": "Lululemon", "CMG": "Chipotle", "YUM": "Yum! Brands", "EBAY": "eBay",
-    "WMT": "Walmart", "COST": "Costco", "PG": "Procter & Gamble", "KO": "Coca-Cola", "PEP": "PepsiCo", "PM": "Philip Morris", 
-    "MO": "Altria", "CL": "Colgate-Palmolive", "EL": "Estee Lauder", "K": "Kellanova", "GIS": "General Mills", "MNST": "Monster Bev",
-    # Auto
-    "TM": "Toyota", "F": "Ford", "GM": "General Motors", "HMC": "Honda", "STLA": "Stellantis", "RIVN": "Rivian", 
-    "LCID": "Lucid", "LI": "Li Auto", "NIO": "NIO", "XPEV": "XPeng",
-    # Industrial & Defense
-    "RTX": "RTX Corp", "LMT": "Lockheed Martin", "BA": "Boeing", "NOC": "Northrop Grumman", "GD": "General Dynamics", 
-    "LHX": "L3Harris", "GE": "GE Aerospace", "TDG": "TransDigm", "AXON": "Axon", "HII": "Huntington Ingalls",
-    "CAT": "Caterpillar", "DE": "Deere", "UNP": "Union Pacific", "UPS": "UPS", "HON": "Honeywell", "ETN": "Eaton", 
-    "ITW": "Illinois Tool Works", "WM": "Waste Management", "MMM": "3M", "FDX": "FedEx", "CSX": "CSX Corp",
-    # Energy & Materials
-    "XOM": "ExxonMobil", "CVX": "Chevron", "SHEL": "Shell", "TTE": "TotalEnergies", "COP": "ConocoPhillips", "BP": "BP plc", 
-    "SLB": "Schlumberger", "EOG": "EOG Resources", "OXY": "Occidental", "MPC": "Marathon Petroleum", "VLO": "Valero",
-    "NEE": "NextEra Energy", "DU": "Duke Energy", "SO": "Southern Co", "AEP": "American Elec", "SRE": "Sempra", "D": "Dominion", 
-    "PEG": "PSEG", "FSLR": "First Solar", "ENPH": "Enphase", "SEDG": "SolarEdge", "PLUG": "Plug Power",
-    "LIN": "Linde", "SCCO": "Southern Copper", "FCX": "Freeport-McMoRan", "NEM": "Newmont", "SHW": "Sherwin-Williams", 
-    "APD": "Air Products", "DD": "DuPont", "CTVA": "Corteva", "ALB": "Albemarle", "NUE": "Nucor", "DOW": "Dow Inc",
-    # Real Estate
-    "PLD": "Prologis", "AMT": "American Tower", "EQIX": "Equinix", "CCI": "Crown Castle", "O": "Realty Income", 
-    "SPG": "Simon Property", "PSA": "Public Storage", "WELL": "Welltower", "DLR": "Digital Realty", "VICI": "VICI Properties",
-    # Media & Leisure
-    "NFLX": "Netflix", "DIS": "Disney", "TMUS": "T-Mobile", "VZ": "Verizon", "T": "AT&T", "CMCSA": "Comcast", "CHTR": "Charter", 
-    "WBD": "Warner Bros", "SPOT": "Spotify", "LYV": "Live Nation", "PARA": "Paramount",
-    "BKNG": "Booking Holdings", "ABNB": "Airbnb", "MAR": "Marriott", "HLT": "Hilton", "DAL": "Delta Air", "UAL": "United Airlines", 
-    "RCL": "Royal Caribbean", "CCL": "Carnival", "LUV": "Southwest", "EXPE": "Expedia", "LVS": "Las Vegas Sands"
-}
-
-# Flatten list for batch fetching
-ALL_TICKERS = list(set([t for s in SECTORS.values() for t in s]))
-
-# --- Data Engine ---
-@st.cache_data(ttl=900)  # Cache for 15 minutes
-def fetch_data():
-    """Fetches 1y data to calculate multiple timeframes."""
+@st.cache_data(ttl=86400) # Cache S&P 500 list for 24 hours
+def get_sp500_components():
+    """Fetches the current S&P 500 constituents and sectors from Wikipedia."""
     try:
-        # Download 1 year of data to calculate YTD, 1M, 1W
+        url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+        tables = pd.read_html(url)
+        df = tables[0]
+        # Clean up column names
+        df = df.rename(columns={'Symbol': 'Ticker', 'GICS Sector': 'Sector', 'Security': 'Name'})
+        return df[['Ticker', 'Name', 'Sector']]
+    except Exception as e:
+        st.error(f"Error fetching S&P 500 list: {e}")
+        return pd.DataFrame(columns=['Ticker', 'Name', 'Sector'])
+
+@st.cache_data(ttl=900)  # Cache market data for 15 minutes
+def fetch_market_data(tickers):
+    """Fetches 1y data for a list of tickers to calculate multiple timeframes."""
+    if not tickers:
+        return pd.DataFrame()
+    try:
+        # Download 1 year of data
         data = yf.download(
-            ALL_TICKERS, 
+            tickers, 
             period="1y", 
             group_by='ticker', 
             threads=True,
@@ -188,8 +87,6 @@ def calculate_change(closes, days_back):
         return 0.0
     
     current = float(closes.iloc[-1])
-    # Use -days_back (e.g., -5 for 1 week)
-    # Ensure we don't go out of bounds
     idx = max(0, len(closes) - 1 - days_back)
     prev = float(closes.iloc[idx])
     
@@ -199,7 +96,7 @@ def calculate_change(closes, days_back):
 def get_detailed_metrics(ticker, live_df):
     """Extracts Price, 1D, 1W, 1M, YTD."""
     try:
-        # Handle MultiIndex columns (Ticker -> Open/High/Low/Close)
+        # Handle MultiIndex columns
         if ticker not in live_df.columns.levels[0]: 
             return None
         
@@ -211,18 +108,13 @@ def get_detailed_metrics(ticker, live_df):
         
         current_price = float(closes.iloc[-1])
         
-        # 1 Day (approx 1 trading day)
+        # Calculate periods
         change_1d = calculate_change(closes, 1)
-        
-        # 1 Week (approx 5 trading days)
         change_1w = calculate_change(closes, 5)
-        
-        # 1 Month (approx 21 trading days)
         change_1m = calculate_change(closes, 21)
         
         # YTD calculation
         current_year = datetime.datetime.now().year
-        # Filter closes for current year
         ytd_closes = closes[closes.index.year == current_year]
         if not ytd_closes.empty:
             start_price = float(ytd_closes.iloc[0])
@@ -240,223 +132,212 @@ def get_detailed_metrics(ticker, live_df):
     except Exception:
         return None
 
-# --- Main UI ---
+# --- App Initialization ---
+
+# 1. Fetch S&P 500 Components (Dynamic Source)
+with st.spinner("Fetching S&P 500 Constituents..."):
+    sp500_df = get_sp500_components()
+
+if sp500_df.empty:
+    st.stop()
+
+# 2. Organize by Sector
+SECTORS = sp500_df['Sector'].unique().tolist()
+SECTORS.sort()
 
 # Initialize Session State
 if 'selected_sector' not in st.session_state:
-    st.session_state.selected_sector = list(SECTORS.keys())[0]
-if 'active_tab' not in st.session_state:
-    st.session_state.active_tab = "Overview"
+    st.session_state.selected_sector = SECTORS[0]
+if 'page' not in st.session_state:
+    st.session_state.page = "Overview"
 
-# Function to switch tab (simulated by updating state and rerun)
-def switch_to_detail(sector_name):
-    st.session_state.selected_sector = sector_name
-    st.session_state.active_tab = "Sector Detail"
-
-# Header
-col_header, col_btn = st.columns([6, 1])
-with col_header:
+# --- Sidebar Navigation ---
+with st.sidebar:
     st.title("Theme Tracker Pro")
-    st.caption(f"Last updated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-with col_btn:
-    st.write("") # Spacer
-    if st.button("🔄 Refresh Data"):
+    st.write(f"Tracking **{len(sp500_df)}** stocks across **{len(SECTORS)}** sectors.")
+    
+    # Navigation Mode
+    nav_selection = st.radio(
+        "Navigation", 
+        ["Overview", "Sector Detail"], 
+        index=0 if st.session_state.page == "Overview" else 1
+    )
+    
+    # Update state based on radio selection
+    if nav_selection != st.session_state.page:
+        st.session_state.page = nav_selection
+        st.rerun()
+    
+    st.markdown("---")
+    
+    # Refresh Button
+    if st.button("🔄 Refresh Market Data", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
+    
+    st.caption(f"Last updated: {datetime.datetime.now().strftime('%H:%M:%S')}")
 
-st.markdown("---")
+# --- Logic for Data Fetching ---
+# We need to fetch data for the relevant stocks.
+# To avoid fetching 500 stocks at once (slow), we fetch based on the view.
 
-# Data Loading
-with st.spinner("Fetching market data (1Y history)..."):
-    live_data = fetch_data()
+if st.session_state.page == "Overview":
+    # For overview, we might pick top 3-5 stocks per sector as proxies, or just fetch all (might be slow).
+    # Let's fetch Top 5 by market cap (approximated by list order usually) for each sector to be fast.
+    # Actually, fetching 500 tickers for 1y history is heavy.
+    # Strategy: Fetch ALL data once (cached) to enable fast switching.
+    target_tickers = sp500_df['Ticker'].tolist()
+else:
+    # Fetch only selected sector
+    target_tickers = sp500_df[sp500_df['Sector'] == st.session_state.selected_sector]['Ticker'].tolist()
 
-if live_data.empty:
-    st.error("Failed to load data. Please refresh.")
-    st.stop()
+with st.spinner(f"Fetching market data for {len(target_tickers)} stocks..."):
+    live_data = fetch_market_data(target_tickers)
 
-# Layout: Simple Tab switch logic using radio or internal buttons if st.tabs is restrictive
-# Note: st.tabs does not support programmatic switching easily in all versions. 
-# We will use st.tabs but rely on user clicking them, OR strictly use state to render content.
-# Given the requirement for "Button moves you to page", we will use conditional rendering based on state.
-
-# Navigation Bar
-nav_col1, nav_col2 = st.columns([1,1])
-with nav_col1:
-    if st.button("🏠 Overview", use_container_width=True, type="primary" if st.session_state.active_tab == "Overview" else "secondary"):
-        st.session_state.active_tab = "Overview"
-        st.rerun()
-with nav_col2:
-    if st.button("📊 Sector Detail", use_container_width=True, type="primary" if st.session_state.active_tab == "Sector Detail" else "secondary"):
-        st.session_state.active_tab = "Sector Detail"
-        st.rerun()
-
-st.markdown("---")
-
-# --- VIEW 1: OVERVIEW (CARD GRID) ---
-if st.session_state.active_tab == "Overview":
+# --- VIEW: OVERVIEW ---
+if st.session_state.page == "Overview":
     st.subheader("Market Sectors Overview")
     
-    # Calculate all metrics first to sort them? Or just display.
-    # Let's display them in a grid.
+    # Create a summary dataframe
+    sector_stats = []
     
-    # Sort sectors by performance? Optional. For now, alphabetical/defined order.
-    
-    for sec_name, sec_tickers in SECTORS.items():
-        # Calculate Sector Aggregates
-        total_change_1d = 0
+    for sec in SECTORS:
+        sec_tickers = sp500_df[sp500_df['Sector'] == sec]['Ticker'].tolist()
+        
+        # Calculate average performance for the sector (using available data)
+        total_1d = 0
         count = 0
         for t in sec_tickers:
             m = get_detailed_metrics(t, live_data)
             if m:
-                total_change_1d += m['1d']
+                total_1d += m['1d']
                 count += 1
         
-        avg_1d = total_change_1d / count if count > 0 else 0.0
+        avg_1d = total_1d / count if count > 0 else 0.0
+        color = "#4CAF50" if avg_1d >= 0 else "#FF4B4B"
         
-        # Color for the border or text
-        color_hex = "#4CAF50" if avg_1d >= 0 else "#FF4B4B"
-        
-        # Create a container "Card"
+        # Display Card
         with st.container():
-            st.markdown(f"""
-            <div style="background-color: #1E1E24; padding: 15px; border-radius: 10px; margin-bottom: 10px; border-left: 5px solid {color_hex}; display: flex; align-items: center; justify-content: space-between;">
-                <div style="flex: 2;">
-                    <h3 style="margin: 0; font-size: 1.2rem;">{sec_name}</h3>
-                    <span style="color: #8b949e; font-size: 0.9rem;">{count} Stocks Tracked</span>
-                </div>
-                <div style="flex: 1; text-align: center;">
-                    <span style="font-size: 1.5rem; font-weight: bold; color: {color_hex};">{avg_1d:+.2%}</span>
-                    <br><span style="font-size: 0.8rem; color: #8b949e;">Daily Avg</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # The "Real Button" to navigate
-            # We use a unique key for each button
-            if st.button(f"View {sec_name} Details ➔", key=f"btn_{sec_name}", use_container_width=True):
-                switch_to_detail(sec_name)
-                st.rerun()
-            
-            st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
+            c1, c2, c3 = st.columns([3, 1, 1])
+            with c1:
+                st.markdown(f"### {sec}")
+                st.caption(f"{count} Stocks")
+            with c2:
+                st.metric("Avg Daily", f"{avg_1d:.2%}")
+            with c3:
+                st.write("")
+                if st.button(f"View {sec} ➔", key=f"nav_{sec}"):
+                    st.session_state.selected_sector = sec
+                    st.session_state.page = "Sector Detail"
+                    st.rerun()
+            st.divider()
 
-
-# --- VIEW 2: SECTOR DETAIL ---
-elif st.session_state.active_tab == "Sector Detail":
+# --- VIEW: SECTOR DETAIL ---
+elif st.session_state.page == "Sector Detail":
     
-    # Back button logic handled by top nav, but good to have context
-    
-    # Controls
-    col_sel, col_tf, col_limit, col_blank = st.columns([2, 1, 1, 1])
-    with col_sel:
-        # Determine index based on session state
-        try:
-            current_sector_idx = list(SECTORS.keys()).index(st.session_state.selected_sector)
-        except ValueError:
-            current_sector_idx = 0
-            
-        selected_sector = st.selectbox(
-            "Select Sector", 
-            list(SECTORS.keys()), 
-            index=current_sector_idx
-        )
+    # Controls Area
+    c_sel, c_tf, c_top = st.columns([2, 1, 1])
+    with c_sel:
+        selected_sector = st.selectbox("Select Sector", SECTORS, index=SECTORS.index(st.session_state.selected_sector))
         st.session_state.selected_sector = selected_sector
-
-    with col_tf:
-        timeframe_options = {
-            "1 Day": "1D %",
-            "1 Week": "1W %",
-            "1 Month": "1M %",
-            "YTD": "YTD %"
-        }
-        selected_tf_label = st.selectbox("Ranking Timeframe", list(timeframe_options.keys()))
-        selected_tf_col = timeframe_options[selected_tf_label]
-
-    with col_limit:
-        st.write("") # Align checkbox
+        
+    with c_tf:
+        timeframe_map = {"1 Day": "1d", "1 Week": "1w", "1 Month": "1m", "YTD": "ytd"}
+        tf_label = st.selectbox("Ranking Timeframe", list(timeframe_map.keys()))
+        tf_key = timeframe_map[tf_label]
+        
+    with c_top:
         st.write("")
-        show_top_10 = st.checkbox("Show Top 10 Only", value=True)
+        st.write("")
+        show_top = st.checkbox("Show Top 10 Only", value=True)
 
-    if selected_sector:
-        tickers = SECTORS[selected_sector]
-        rows = []
-        
-        # Sector Aggregate Metrics
-        sec_1d, sec_1w, sec_1m, sec_ytd = 0, 0, 0, 0
-        valid_count = 0
-
-        for t in tickers:
-            m = get_detailed_metrics(t, live_data)
-            if m:
-                clean_ticker = t.replace(".", "-") if "." in t else t
-                logo_url = f"https://assets.parqet.com/logos/symbol/{clean_ticker}?format=png"
-
-                rows.append({
-                    "Logo": logo_url,
-                    "Symbol": t,
-                    "Name": COMPANY_NAMES.get(t, t),
-                    "Price": m['price'],
-                    "1D %": m['1d'],
-                    "1W %": m['1w'],
-                    "1M %": m['1m'],
-                    "YTD %": m['ytd']
-                })
-                sec_1d += m['1d']
-                sec_1w += m['1w']
-                sec_1m += m['1m']
-                sec_ytd += m['ytd']
-                valid_count += 1
-        
-        # Display Sector Aggregates
-        if valid_count > 0:
-            st.markdown(f"### {selected_sector} Performance")
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("1 Day", f"{sec_1d/valid_count:.2%}", delta_color="normal")
-            m2.metric("1 Week", f"{sec_1w/valid_count:.2%}", delta_color="normal")
-            m3.metric("1 Month", f"{sec_1m/valid_count:.2%}", delta_color="normal")
-            m4.metric("YTD", f"{sec_ytd/valid_count:.2%}", delta_color="normal")
-            st.markdown("---")
-
-        df_detail = pd.DataFrame(rows)
-        
-        if not df_detail.empty:
-            # Sort by the selected timeframe column
-            df_detail = df_detail.sort_values(selected_tf_col, ascending=False)
+    # Process Data for Table
+    sec_tickers = sp500_df[sp500_df['Sector'] == selected_sector]['Ticker'].tolist()
+    rows = []
+    
+    for t in sec_tickers:
+        m = get_detailed_metrics(t, live_data)
+        name = sp500_df[sp500_df['Ticker'] == t]['Name'].values[0]
+        if m:
+            clean_ticker = t.replace(".", "-")
+            logo_url = f"https://assets.parqet.com/logos/symbol/{clean_ticker}?format=png"
             
-            # Apply Top 10 Filter
-            if show_top_10:
-                df_detail = df_detail.head(10)
+            rows.append({
+                "Logo": logo_url,
+                "Symbol": t,
+                "Name": name,
+                "Price": m['price'],
+                "1d": m['1d'],
+                "1w": m['1w'],
+                "1m": m['1m'],
+                "ytd": m['ytd']
+            })
             
-            # --- DIVERGING BARS FIX ---
-            # We strictly separate Styler from Column Config.
-            # Styler handles the color bars.
-            # Column Config handles the Image, Text, and basic numbers (Price).
+    df_detail = pd.DataFrame(rows)
+    
+    if not df_detail.empty:
+        # Sort
+        df_detail = df_detail.sort_values(tf_key, ascending=False)
+        
+        # Filter Top 10
+        if show_top:
+            df_detail = df_detail.head(10)
             
-            styler_detail = df_detail.style.format({
-                "1D %": "{:+.2%}",
-                "1W %": "{:+.2%}",
-                "1M %": "{:+.2%}",
-                "YTD %": "{:+.2%}",
-                "Price": "${:.2f}"
-            }).bar(
-                subset=[selected_tf_col], # Dynamic column based on user selection
-                align=0,
-                color=['#FF4B4B', '#4CAF50'], # Red for Neg, Green for Pos
-                vmin=-0.05,
-                vmax=0.05
-            )
-
-            st.dataframe(
-                styler_detail,
-                column_config={
-                    "Logo": st.column_config.ImageColumn("Logo", width="small"),
-                    "Symbol": st.column_config.TextColumn("Symbol", width="small"),
-                    "Name": st.column_config.TextColumn("Company Name", width="medium"),
-                    "Price": st.column_config.NumberColumn("Price"),
-                    # IMPORTANT: We DO NOT configure the % columns here to avoid overriding the Styler.
-                },
-                hide_index=True,
-                width="stretch",
-                height=600
-            )
-        else:
-            st.info("No data available for this sector.")
+        # --- VISUALIZATION: Diverging Bar Chart (Altair) ---
+        # This is the most reliable way to show Green/Red bars in Streamlit
+        st.subheader(f"Top Movers ({tf_label})")
+        
+        chart_data = df_detail.copy()
+        chart_data['Color'] = chart_data[tf_key].apply(lambda x: 'Positive' if x >= 0 else 'Negative')
+        
+        # Base Chart
+        bar_chart = alt.Chart(chart_data).mark_bar().encode(
+            x=alt.X(f"{tf_key}:Q", axis=alt.Axis(format='%'), title="Performance"),
+            y=alt.Y("Symbol:N", sort="-x", title=None),
+            color=alt.Color("Color:N", scale=alt.Scale(domain=['Positive', 'Negative'], range=['#4CAF50', '#FF4B4B']), legend=None),
+            tooltip=["Name", "Price", alt.Tooltip(f"{tf_key}:Q", format=".2%")]
+        ).properties(height=max(400, len(df_detail) * 30))
+        
+        st.altair_chart(bar_chart, use_container_width=True)
+        
+        # --- DATA TABLE: Background Gradient ---
+        # Instead of bars (which are buggy in st.dataframe), we use a heatmap style which works perfectly.
+        st.subheader("Detailed Data")
+        
+        # Format columns for display (keeping raw numbers for styling)
+        display_df = df_detail.copy()
+        
+        # Apply Pandas Styling
+        # Background gradient: Red (Low) -> Transparent (Zero) -> Green (High)
+        styler = display_df.style.format({
+            "Price": "${:.2f}",
+            "1d": "{:+.2%}",
+            "1w": "{:+.2%}",
+            "1m": "{:+.2%}",
+            "ytd": "{:+.2%}"
+        }).background_gradient(
+            subset=["1d", "1w", "1m", "ytd"],
+            cmap="RdYlGn", # Red-Yellow-Green colormap
+            vmin=-0.05, 
+            vmax=0.05
+        )
+        
+        st.dataframe(
+            styler,
+            column_config={
+                "Logo": st.column_config.ImageColumn("Logo", width="small"),
+                "Symbol": st.column_config.TextColumn("Symbol", width="small"),
+                "Name": st.column_config.TextColumn("Name", width="large"),
+                "Price": st.column_config.NumberColumn("Price"),
+                # We let the Styler handle the colors for % columns
+                "1d": st.column_config.Column("1 Day"),
+                "1w": st.column_config.Column("1 Week"),
+                "1m": st.column_config.Column("1 Month"),
+                "ytd": st.column_config.Column("YTD"),
+            },
+            hide_index=True,
+            use_container_width=True,
+            height=500
+        )
+    else:
+        st.info("No data available.")
