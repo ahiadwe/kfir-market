@@ -273,7 +273,7 @@ with tab_overview:
                 "Count": st.column_config.NumberColumn("Tickers", format="%d")
             },
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
             height=600
         )
 
@@ -349,7 +349,7 @@ with tab_detail:
                     "YTD %": st.column_config.NumberColumn("YTD", format="%.2f%%"),
                 },
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
                 height=600
             )
         else:
