@@ -336,27 +336,32 @@ elif st.session_state.page == "Sector Detail":
         
         st.altair_chart(bar_chart, use_container_width=True)
         
-        # --- DATA TABLE: Background Gradient ---
-        # Instead of bars (which are buggy in st.dataframe), we use a heatmap style which works perfectly.
+        # --- DATA TABLE: Custom Coloring (No Matplotlib) ---
         st.subheader("Detailed Data")
         
         # Format columns for display (keeping raw numbers for styling)
         display_df = df_detail.copy()
         
-        # Apply Pandas Styling
-        # Background gradient: Red (Low) -> Transparent (Zero) -> Green (High)
+        # Custom styling function
+        def style_positive_negative(val):
+            try:
+                v = float(val)
+                if v > 0:
+                    return 'color: #4CAF50; font-weight: bold'
+                elif v < 0:
+                    return 'color: #FF4B4B; font-weight: bold'
+                return ''
+            except:
+                return ''
+
+        # Apply Pandas Styling without matplotlib dependency
         styler = display_df.style.format({
             "Price": "${:.2f}",
             "1d": "{:+.2%}",
             "1w": "{:+.2%}",
             "1m": "{:+.2%}",
             "ytd": "{:+.2%}"
-        }).background_gradient(
-            subset=["1d", "1w", "1m", "ytd"],
-            cmap="RdYlGn", # Red-Yellow-Green colormap
-            vmin=-0.05, 
-            vmax=0.05
-        )
+        }).map(style_positive_negative, subset=["1d", "1w", "1m", "ytd"])
         
         st.dataframe(
             styler,
