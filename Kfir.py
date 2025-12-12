@@ -53,15 +53,26 @@ st.markdown("""
         border: 1px solid rgba(255, 255, 255, 0.05);
         padding: 10px;
     }
-    
-    /* Pills/Segments */
-    div[data-testid="stSegmentedControl"] button {
-        background-color: #161b22;
-        color: #8b949e;
+
+    /* Tabs Styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
+        background-color: transparent;
     }
-    div[data-testid="stSegmentedControl"] button[data-selected="true"] {
-        background-color: #238636; 
+    .stTabs [data-baseweb="tab"] {
+        background-color: rgba(255,255,255,0.05);
+        border-radius: 4px;
+        color: #8b949e;
+        border: 1px solid transparent;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
         color: white;
+        background-color: rgba(255,255,255,0.1);
+    }
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        background-color: #238636;
+        color: white;
+        border: 1px solid rgba(255,255,255,0.1);
     }
 
     /* Remove standard padding */
@@ -77,22 +88,22 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- Constants ---
+# --- Constants (Real Names) ---
 SECTORS = {
-    "💾 Semiconductors": ["NVDA", "AMD", "INTC", "TSM", "AVGO", "QCOM", "MU", "TXN", "ARM"],
-    "🚗 EV & Mobility": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "ON", "LI"],
-    "☁️ Cloud & SaaS": ["MSFT", "ADBE", "CRM", "SNOW", "DDOG", "NOW", "WDAY", "ZS", "HUBS"],
-    "🛡️ Cybersecurity": ["PANW", "CRWD", "FTNT", "OKTA", "CYBR", "S", "NET", "TENB"],
-    "🤖 AI & Robotics": ["ISRG", "PATH", "IRBT", "UPST", "PLTR", "AI", "GOOGL", "SYM"],
-    "🛒 E-Commerce": ["AMZN", "BABA", "JD", "SHOP", "MELI", "EBAY", "ETSY", "CPNG"],
-    "🧬 Biotech": ["PFE", "MRNA", "BNTX", "LLY", "UNH", "JNJ", "ABBV", "VRTX"],
-    "💳 Fintech": ["PYPL", "AXP", "COIN", "AFRM", "V", "MA", "HOOD", "SQ"],
-    "⚡ Energy": ["XOM", "CVX", "SHEL", "BP", "COP", "SLB", "OXY", "HAL"],
-    "🛍️ Retail": ["WMT", "TGT", "COST", "HD", "LOW", "NKE", "SBUX", "LULU"],
-    "📺 Media": ["NFLX", "DIS", "CMCSA", "WBD", "PARA", "SPOT", "ROKU"],
-    "✈️ Travel": ["BKNG", "ABNB", "MAR", "DAL", "UAL", "CCL", "RCL", "LUV"],
-    "⚔️ Defense": ["RTX", "LMT", "BA", "NOC", "GD", "LHX", "HII"],
-    "🎮 Gaming": ["TTWO", "EA", "RBLX", "U", "SONY", "NTDOY", "ATVI"]
+    "Semiconductors": ["NVDA", "AMD", "INTC", "TSM", "AVGO", "QCOM", "MU", "TXN", "ARM"],
+    "EV & Mobility": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "ON", "LI"],
+    "Cloud & SaaS": ["MSFT", "ADBE", "CRM", "SNOW", "DDOG", "NOW", "WDAY", "ZS", "HUBS"],
+    "Cybersecurity": ["PANW", "CRWD", "FTNT", "OKTA", "CYBR", "S", "NET", "TENB"],
+    "AI & Robotics": ["ISRG", "PATH", "IRBT", "UPST", "PLTR", "AI", "GOOGL", "SYM"],
+    "E-Commerce": ["AMZN", "BABA", "JD", "SHOP", "MELI", "EBAY", "ETSY", "CPNG"],
+    "Biotech": ["PFE", "MRNA", "BNTX", "LLY", "UNH", "JNJ", "ABBV", "VRTX"],
+    "Fintech": ["PYPL", "AXP", "COIN", "AFRM", "V", "MA", "HOOD", "SQ"],
+    "Energy": ["XOM", "CVX", "SHEL", "BP", "COP", "SLB", "OXY", "HAL"],
+    "Retail": ["WMT", "TGT", "COST", "HD", "LOW", "NKE", "SBUX", "LULU"],
+    "Media": ["NFLX", "DIS", "CMCSA", "WBD", "PARA", "SPOT", "ROKU"],
+    "Travel": ["BKNG", "ABNB", "MAR", "DAL", "UAL", "CCL", "RCL", "LUV"],
+    "Defense": ["RTX", "LMT", "BA", "NOC", "GD", "LHX", "HII"],
+    "Gaming": ["TTWO", "EA", "RBLX", "U", "SONY", "NTDOY", "ATVI"]
 }
 
 INDICES = {"S&P 500": "^GSPC", "Nasdaq": "^IXIC", "Bitcoin": "BTC-USD"}
@@ -267,117 +278,181 @@ for idx, (name, ticker) in enumerate(INDICES.items()):
 
 st.markdown("---")
 
-# 3. Navigation & Filtering
-c1, c2 = st.columns([3, 1])
-with c1:
-    selected_sector = st.pills(
-        "Select Sector", 
-        list(SECTORS.keys()), 
-        default="💾 Semiconductors",
-        selection_mode="single"
-    )
-with c2:
-    st.markdown("### ") # Spacer
-    view_mode = st.segmented_control("View", ["Dashboard", "Analysis"], default="Dashboard")
+# 3. Main Navigation (Tabs)
+tab_overview, tab_analysis = st.tabs(["📊 Market Overview", "🔍 Sector Deep Dive"])
 
-# 4. Sector Content
-if selected_sector:
-    tickers = SECTORS[selected_sector]
+# --- TAB 1: MARKET OVERVIEW (The new "Something like this" view) ---
+with tab_overview:
+    st.caption("Real-time performance by sector")
     
-    # Process data for table
-    table_data = []
-    for t in tickers:
-        m = get_ticker_metrics(t, live_data, daily_data)
-        if m:
-            table_data.append({
-                "Ticker": t,
-                "Price": m['price'],
-                "Change %": m['pct_change'],
-                "Volume": m['volume'],
-                "Trend Data": m['history'] # Hidden column for logic
+    sector_summary = []
+    
+    # Aggregate data for each sector
+    for sec_name, sec_tickers in SECTORS.items():
+        total_change = 0
+        valid_count = 0
+        trend_agg = []
+        
+        # We need to average the trend lines to show a "Sector Trend"
+        # This is a bit complex, so we will pick the 'leader' (first ticker) for the sparkline 
+        # to keep performance high, or average the scalar change.
+        
+        first_ticker_history = []
+        
+        for t in sec_tickers:
+            m = get_ticker_metrics(t, live_data, daily_data)
+            if m:
+                total_change += m['pct_change']
+                valid_count += 1
+                if not first_ticker_history:
+                    first_ticker_history = m['history']
+
+        if valid_count > 0:
+            avg_change = total_change / valid_count
+            sector_summary.append({
+                "Theme / Sector": sec_name,
+                "Daily Performance": avg_change / 100, # Divide by 100 for column config %
+                "Trend": first_ticker_history # Using leader trend for sparkline visual
             })
     
-    df_table = pd.DataFrame(table_data)
+    df_overview = pd.DataFrame(sector_summary)
     
-    if not df_table.empty:
-        # Layout: Master (Table) - Detail (Chart)
-        col_list, col_detail = st.columns([1.5, 1])
+    if not df_overview.empty:
+        # Sort by performance
+        df_overview = df_overview.sort_values("Daily Performance", ascending=False)
         
-        with col_list:
-            st.subheader(f"{selected_sector}")
-            
-            # Interactive DataFrame
-            event = st.dataframe(
-                df_table,
-                column_config={
-                    "Ticker": st.column_config.TextColumn("Symbol", width="small"),
-                    "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
-                    "Change %": st.column_config.NumberColumn(
-                        "Change", 
-                        format="%.2f%%",
-                        help="Daily percent change"
-                    ),
-                    "Volume": st.column_config.ProgressColumn(
-                        "Vol Intensity",
-                        min_value=0,
-                        max_value=df_table['Volume'].max(),
-                        format="%d",
-                    ),
-                    "Trend Data": None 
-                },
-                hide_index=True,
-                selection_mode="single-row",
-                on_select="rerun",
-                use_container_width=True,
-                height=500
-            )
-
-        with col_detail:
-            # Determine which ticker to show
-            selected_ticker = tickers[0] # Default to first
-            
-            # Check if user selected a row
-            if len(event.selection.rows) > 0:
-                row_idx = event.selection.rows[0]
-                selected_ticker = df_table.iloc[row_idx]["Ticker"]
-            
-            # Get details for selected ticker
-            m_sel = get_ticker_metrics(selected_ticker, live_data, daily_data)
-            
-            if m_sel:
-                # Top Stats Card
-                st.markdown(f"""
-                <div style="padding: 15px; background: rgba(255,255,255,0.05); border-radius: 10px; margin-bottom: 20px; border-left: 4px solid {'#00ff88' if m_sel['pct_change'] > 0 else '#ff0055'}">
-                    <h2 style="margin:0; color:white;">{selected_ticker}</h2>
-                    <h1 style="margin:0; font-size: 3em;">${m_sel['price']:.2f}</h1>
-                    <span style="color: {'#00ff88' if m_sel['pct_change'] > 0 else '#ff0055'}; font-size: 1.2em; font-weight: bold;">
-                        {m_sel['pct_change']:+.2f}%
-                    </span>
-                    <span style="color: #888; margin-left: 10px;">Today's Move</span>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Chart
-                chart = plot_candle_chart(selected_ticker, live_data)
-                if chart:
-                    st.altair_chart(chart, use_container_width=True)
-                
-                # Additional Stats (Mocked for visual completeness, but could be real)
-                st.markdown("#### Key Statistics")
-                s1, s2, s3 = st.columns(3)
-                t_daily = daily_data[selected_ticker] if selected_ticker in daily_data else pd.DataFrame()
-                
-                high_52 = t_daily['High'].max() if not t_daily.empty else 0
-                low_52 = t_daily['Low'].min() if not t_daily.empty else 0
-                avg_vol = t_daily['Volume'].mean() if not t_daily.empty else 0
-                
-                s1.metric("52W High", f"${high_52:.0f}")
-                s2.metric("52W Low", f"${low_52:.0f}")
-                s3.metric("Avg Vol", f"{avg_vol/1e6:.1f}M")
-            
+        st.dataframe(
+            df_overview,
+            column_config={
+                "Theme / Sector": st.column_config.TextColumn("Theme / Sector", width="medium"),
+                "Trend": st.column_config.LineChartColumn(
+                    "Trend (Leader)",
+                    y_min=None, 
+                    y_max=None,
+                    width="small"
+                ),
+                "Daily Performance": st.column_config.ProgressColumn(
+                    "Daily Performance",
+                    format="%.2f%%",
+                    min_value=-0.05,
+                    max_value=0.05,
+                )
+            },
+            hide_index=True,
+            use_container_width=True,
+            height=600
+        )
     else:
-        st.info("No data available for this sector.")
+        st.info("Market data unavailable. Please refresh.")
+
+# --- TAB 2: SECTOR DEEP DIVE (Detailed view) ---
+with tab_analysis:
+    # Sector Selection within the tab
+    selected_sector = st.pills(
+        "Choose Sector", 
+        list(SECTORS.keys()), 
+        default="Semiconductors",
+        selection_mode="single",
+        label_visibility="collapsed"
+    )
+
+    if selected_sector:
+        tickers = SECTORS[selected_sector]
+        
+        # Process data for table
+        table_data = []
+        for t in tickers:
+            m = get_ticker_metrics(t, live_data, daily_data)
+            if m:
+                table_data.append({
+                    "Ticker": t,
+                    "Price": m['price'],
+                    "Change %": m['pct_change'],
+                    "Volume": m['volume'],
+                    "Trend Data": m['history'] # Hidden column for logic
+                })
+        
+        df_table = pd.DataFrame(table_data)
+        
+        if not df_table.empty:
+            # Layout: Master (Table) - Detail (Chart)
+            col_list, col_detail = st.columns([1.5, 1])
+            
+            with col_list:
+                st.subheader(f"{selected_sector} Components")
+                
+                # Interactive DataFrame
+                event = st.dataframe(
+                    df_table,
+                    column_config={
+                        "Ticker": st.column_config.TextColumn("Symbol", width="small"),
+                        "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
+                        "Change %": st.column_config.NumberColumn(
+                            "Change", 
+                            format="%.2f%%",
+                            help="Daily percent change"
+                        ),
+                        "Volume": st.column_config.ProgressColumn(
+                            "Vol Intensity",
+                            min_value=0,
+                            max_value=df_table['Volume'].max(),
+                            format="%d",
+                        ),
+                        "Trend Data": None 
+                    },
+                    hide_index=True,
+                    selection_mode="single-row",
+                    on_select="rerun",
+                    use_container_width=True,
+                    height=500
+                )
+
+            with col_detail:
+                # Determine which ticker to show
+                selected_ticker = tickers[0] # Default to first
+                
+                # Check if user selected a row
+                if len(event.selection.rows) > 0:
+                    row_idx = event.selection.rows[0]
+                    selected_ticker = df_table.iloc[row_idx]["Ticker"]
+                
+                # Get details for selected ticker
+                m_sel = get_ticker_metrics(selected_ticker, live_data, daily_data)
+                
+                if m_sel:
+                    # Top Stats Card
+                    st.markdown(f"""
+                    <div style="padding: 15px; background: rgba(255,255,255,0.05); border-radius: 10px; margin-bottom: 20px; border-left: 4px solid {'#00ff88' if m_sel['pct_change'] > 0 else '#ff0055'}">
+                        <h2 style="margin:0; color:white;">{selected_ticker}</h2>
+                        <h1 style="margin:0; font-size: 3em;">${m_sel['price']:.2f}</h1>
+                        <span style="color: {'#00ff88' if m_sel['pct_change'] > 0 else '#ff0055'}; font-size: 1.2em; font-weight: bold;">
+                            {m_sel['pct_change']:+.2f}%
+                        </span>
+                        <span style="color: #888; margin-left: 10px;">Today's Move</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Chart
+                    chart = plot_candle_chart(selected_ticker, live_data)
+                    if chart:
+                        st.altair_chart(chart, use_container_width=True)
+                    
+                    # Additional Stats
+                    t_daily = daily_data[selected_ticker] if selected_ticker in daily_data else pd.DataFrame()
+                    
+                    high_52 = t_daily['High'].max() if not t_daily.empty else 0
+                    low_52 = t_daily['Low'].min() if not t_daily.empty else 0
+                    avg_vol = t_daily['Volume'].mean() if not t_daily.empty else 0
+                    
+                    # Grid for stats
+                    s1, s2, s3 = st.columns(3)
+                    s1.metric("52W High", f"${high_52:.0f}")
+                    s2.metric("52W Low", f"${low_52:.0f}")
+                    s3.metric("Avg Vol", f"{avg_vol/1e6:.1f}M")
+                
+        else:
+            st.info("No data available for this sector.")
 
 # Footer
 st.markdown("---")
-st.caption("Theme Tracker Pro v2.0 | Built with Streamlit & Altair")
+st.caption("Theme Tracker Pro v2.1 | Built with Streamlit & Altair")
