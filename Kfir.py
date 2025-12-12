@@ -54,6 +54,25 @@ SECTORS = {
     "🏠 Real Estate": ["PLD", "AMT", "EQIX", "O", "SPG"]
 }
 
+# Mapping Tickers to Company Names
+COMPANY_NAMES = {
+    "NVDA": "NVIDIA", "AMD": "Advanced Micro Devices", "INTC": "Intel", "TSM": "TSMC", "AVGO": "Broadcom", "QCOM": "Qualcomm", "MU": "Micron", "TXN": "Texas Instruments",
+    "TSLA": "Tesla", "RIVN": "Rivian", "LCID": "Lucid Group", "NIO": "NIO Inc", "XPEV": "XPeng", "GM": "General Motors", "F": "Ford", "ON": "ON Semiconductor",
+    "MSFT": "Microsoft", "ADBE": "Adobe", "CRM": "Salesforce", "SNOW": "Snowflake", "DDOG": "Datadog", "NOW": "ServiceNow", "WDAY": "Workday", "ZS": "Zscaler",
+    "PANW": "Palo Alto Networks", "CRWD": "CrowdStrike", "FTNT": "Fortinet", "OKTA": "Okta", "CYBR": "CyberArk", "S": "SentinelOne", "NET": "Cloudflare",
+    "ISRG": "Intuitive Surgical", "PATH": "UiPath", "IRBT": "iRobot", "UPST": "Upstart", "PLTR": "Palantir", "AI": "C3.ai", "GOOGL": "Alphabet (Google)",
+    "AMZN": "Amazon", "BABA": "Alibaba", "JD": "JD.com", "SHOP": "Shopify", "MELI": "MercadoLibre", "EBAY": "eBay", "ETSY": "Etsy",
+    "PFE": "Pfizer", "MRNA": "Moderna", "BNTX": "BioNTech", "LLY": "Eli Lilly", "UNH": "UnitedHealth", "JNJ": "Johnson & Johnson", "ABBV": "AbbVie",
+    "PYPL": "PayPal", "AXP": "American Express", "COIN": "Coinbase", "AFRM": "Affirm", "V": "Visa", "MA": "Mastercard", "HOOD": "Robinhood",
+    "XOM": "Exxon Mobil", "CVX": "Chevron", "SHEL": "Shell", "BP": "BP plc", "COP": "ConocoPhillips", "SLB": "Schlumberger",
+    "WMT": "Walmart", "TGT": "Target", "COST": "Costco", "HD": "Home Depot", "LOW": "Lowe's", "NKE": "Nike", "SBUX": "Starbucks",
+    "NFLX": "Netflix", "DIS": "Disney", "CMCSA": "Comcast", "WBD": "Warner Bros. Discovery", "PARA": "Paramount", "SPOT": "Spotify",
+    "BKNG": "Booking Holdings", "ABNB": "Airbnb", "MAR": "Marriott", "DAL": "Delta Air Lines", "UAL": "United Airlines", "CCL": "Carnival Corp", "RCL": "Royal Caribbean",
+    "RTX": "Raytheon", "LMT": "Lockheed Martin", "BA": "Boeing", "NOC": "Northrop Grumman", "GD": "General Dynamics",
+    "TTWO": "Take-Two Interactive", "EA": "Electronic Arts", "RBLX": "Roblox", "U": "Unity Software", "SONY": "Sony", "NTDOY": "Nintendo",
+    "PLD": "Prologis", "AMT": "American Tower", "EQIX": "Equinix", "O": "Realty Income", "SPG": "Simon Property Group"
+}
+
 INDICES = ["^GSPC", "^IXIC", "BTC-USD"]
 
 # Helper to flatten list
@@ -256,9 +275,11 @@ else:
         if m:
             # Add Icons
             icon = "☾" if m['Extended'] else ""
+            company_name = COMPANY_NAMES.get(t, t) # Fetch company name
             
             rows.append({
                 "Ticker": f"{t} {icon}",
+                "Name": company_name,
                 "Price": m['Price'],
                 "Change": m['Change']/100, # Divide by 100 for percentage formatting in dataframe
                 "Volume": m['Volume'], # Keep raw for sorting
@@ -277,6 +298,7 @@ else:
             df_sector,
             column_config={
                 "Ticker": st.column_config.TextColumn("Symbol", help="☾ = Extended Hours"),
+                "Name": st.column_config.TextColumn("Company"),
                 "Price": st.column_config.NumberColumn("Price", format="$%.2f"),
                 "Change": st.column_config.NumberColumn(
                     "Change", 
