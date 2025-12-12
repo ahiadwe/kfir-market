@@ -4,6 +4,7 @@ import pandas as pd
 import altair as alt
 from datetime import datetime, timedelta
 import pytz
+import math
 
 # --- Configuration ---
 st.set_page_config(
@@ -181,12 +182,19 @@ def get_ticker_metrics(ticker, live_df, daily_df):
         # Get simple sparkline data (last 20 points of 15m data)
         sparkline = valid_closes.tail(24).tolist() # last 6 hours approx
         
+        # Safe volume retrieval
+        vol = 0.0
+        if 'Volume' in t_live:
+            v = t_live['Volume'].iloc[-1]
+            if pd.notna(v):
+                vol = float(v)
+
         return {
             "price": current_price,
             "change": change,
             "pct_change": pct_change,
             "history": sparkline,
-            "volume": float(t_live['Volume'].iloc[-1]) if 'Volume' in t_live else 0
+            "volume": vol
         }
     except Exception:
         return None
@@ -381,6 +389,13 @@ with tab_analysis:
             with col_list:
                 st.subheader(f"{selected_sector} Components")
                 
+                # Determine safe max volume for progress bar
+                max_vol = df_table['Volume'].max()
+                if pd.isna(max_vol) or max_vol <= 0:
+                    max_vol = 100.0 # Default fallback to prevent JSON serialization error
+                else:
+                    max_vol = float(max_vol)
+
                 # Interactive DataFrame
                 event = st.dataframe(
                     df_table,
@@ -395,7 +410,7 @@ with tab_analysis:
                         "Volume": st.column_config.ProgressColumn(
                             "Vol Intensity",
                             min_value=0,
-                            max_value=df_table['Volume'].max(),
+                            max_value=max_vol,
                             format="%d",
                         ),
                         "Trend Data": None 
