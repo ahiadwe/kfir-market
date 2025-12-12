@@ -233,6 +233,10 @@ def get_detailed_metrics(ticker, live_df):
 
 # --- Main UI ---
 
+# Initialize Session State for Sector Selection
+if 'selected_sector' not in st.session_state:
+    st.session_state.selected_sector = list(SECTORS.keys())[0]
+
 # Header with Refresh Button
 col_header, col_btn = st.columns([6, 1])
 with col_header:
@@ -289,7 +293,6 @@ with tab_overview:
         df_overview = df_overview.sort_values("Daily", ascending=False)
         
         # Apply Pandas Styling for diverging bars (Green/Red)
-        # Note: We use a Styler object to achieve the 'split' bar visualization
         styler_overview = df_overview.style.format({
             "Daily": "{:+.2%}",
             "YTD": "{:+.2%}"
@@ -301,7 +304,8 @@ with tab_overview:
             vmax=0.05
         )
 
-        st.dataframe(
+        # Interactive Dataframe to allow selection
+        event = st.dataframe(
             styler_overview,
             column_config={
                 "Theme / Sector": st.column_config.TextColumn("Theme / Sector", width="large"),
@@ -311,18 +315,48 @@ with tab_overview:
             },
             hide_index=True,
             width="stretch",
-            height=800
+            height=800,
+            on_select="rerun",
+            selection_mode="single-row"
         )
+        
+        # Handle Selection
+        if len(event.selection.rows) > 0:
+            selected_row_idx = event.selection.rows[0]
+            # Since df is sorted, we use iloc on the sorted df
+            new_sector = df_overview.iloc[selected_row_idx]["Theme / Sector"]
+            
+            if st.session_state.selected_sector != new_sector:
+                st.session_state.selected_sector = new_sector
+                st.toast(f"Selected: {new_sector}. Please switch to 'Sector Detail' tab.", icon="✅")
 
 # --- TAB 2: SECTOR DETAIL ---
 with tab_detail:
-    col_sel, col_blank = st.columns([1, 2])
+    # Determine index for selectbox based on session state
+    try:
+        current_sector_idx = list(SECTORS.keys()).index(st.session_state.selected_sector)
+    except ValueError:
+        current_sector_idx = 0
+
+    col_sel, col_tf, col_blank = st.columns([2, 1, 1])
     with col_sel:
         selected_sector = st.selectbox(
             "Select Sector", 
             list(SECTORS.keys()), 
-            index=0
+            index=current_sector_idx
         )
+        # Update session state if manually changed here
+        st.session_state.selected_sector = selected_sector
+
+    with col_tf:
+        timeframe_options = {
+            "1 Day": "1D %",
+            "1 Week": "1W %",
+            "1 Month": "1M %",
+            "YTD": "YTD %"
+        }
+        selected_tf_label = st.selectbox("Ranking Timeframe", list(timeframe_options.keys()))
+        selected_tf_col = timeframe_options[selected_tf_label]
 
     if selected_sector:
         tickers = SECTORS[selected_sector]
@@ -336,7 +370,6 @@ with tab_detail:
             m = get_detailed_metrics(t, live_data)
             if m:
                 # Construct Logo URL (using parqet as a public source)
-                # Clean ticker for potential URL issues (though most standard tickers work)
                 clean_ticker = t.replace(".", "-") if "." in t else t
                 logo_url = f"https://assets.parqet.com/logos/symbol/{clean_ticker}?format=png"
 
@@ -370,10 +403,10 @@ with tab_detail:
         df_detail = pd.DataFrame(rows)
         
         if not df_detail.empty:
-            # User can sort by any column, default to 1D perf
-            df_detail = df_detail.sort_values("1D %", ascending=False)
+            # Sort by the selected timeframe column
+            df_detail = df_detail.sort_values(selected_tf_col, ascending=False)
             
-            # Apply styling to detail view as well for 1D %
+            # Apply styling to detail view with dynamic column selection
             styler_detail = df_detail.style.format({
                 "1D %": "{:+.2%}",
                 "1W %": "{:+.2%}",
@@ -381,7 +414,7 @@ with tab_detail:
                 "YTD %": "{:+.2%}",
                 "Price": "${:.2f}"
             }).bar(
-                subset=["1D %"],
+                subset=[selected_tf_col], # Dynamic column based on user selection
                 align=0,
                 color=['#FF4B4B', '#4CAF50'],
                 vmin=-0.05,
