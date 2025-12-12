@@ -1,8 +1,7 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
+import altair as alt
 from datetime import datetime, timedelta
 import pytz
 
@@ -183,57 +182,60 @@ def get_ticker_metrics(ticker, live_df, daily_df):
 
 # --- Charts ---
 
-def plot_sparkline(data, color):
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        y=data, 
-        mode='lines', 
-        line=dict(color=color, width=2),
-        fill='tozeroy',
-        fillcolor=f"rgba({color[4:-1]}, 0.2)" # rough hack for rgba
-    ))
-    fig.update_layout(
-        showlegend=False,
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=50,
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False)
-    )
-    return fig
-
 def plot_candle_chart(ticker, data):
-    """Interactive Candlestick chart for the detail view."""
+    """Interactive Candlestick chart using Altair (No Plotly dependency)."""
     if ticker not in data.columns.levels[0]:
         return None
     
     df = data[ticker].dropna().reset_index()
-    # Ensure Datetime is timezone aware or naive consistent
-    df.columns = [c.lower() for c in df.columns] # standardize datetime/open/high...
+    # Ensure columns are lower case for consistency
+    df.columns = [c.lower() for c in df.columns] 
     
-    fig = go.Figure(data=[go.Candlestick(
-        x=df.iloc[:, 0], # First column is date/datetime
-        open=df['open'],
-        high=df['high'],
-        low=df['low'],
-        close=df['close'],
-        increasing_line_color='#26a69a', 
-        decreasing_line_color='#ef5350'
-    )])
+    # Rename 'Datetime' or 'Date' to a standard 'date' column for Altair
+    if 'datetime' in df.columns:
+        df = df.rename(columns={'datetime': 'date'})
+    elif 'date' not in df.columns: # fallback if index name was lost
+        df['date'] = df.index
 
-    fig.update_layout(
-        title=f"{ticker} • 5-Day Intraday",
-        template="plotly_dark",
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        height=350,
-        margin=dict(l=10, r=10, t=40, b=10),
-        xaxis_rangeslider_visible=False,
-        xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.1)')
+    # Base chart
+    base = alt.Chart(df).encode(
+        x=alt.X('date:T', axis=alt.Axis(
+            title=None, 
+            format='%m-%d %H:%M', 
+            labelColor='#888',
+            gridColor='#333'
+        ))
     )
-    return fig
+
+    # Candlestick Rule (Low to High)
+    rule = base.mark_rule().encode(
+        y=alt.Y('low:Q', scale=alt.Scale(zero=False), axis=alt.Axis(title='Price', labelColor='#888', gridColor='#333')),
+        y2='high:Q',
+        color=alt.value('#555')
+    )
+
+    # Candlestick Bar (Open to Close)
+    bar = base.mark_bar(size=4).encode(
+        y='open:Q',
+        y2='close:Q',
+        color=alt.condition(
+            "datum.open <= datum.close",
+            alt.value("#00ff88"),  # Green/Bullish
+            alt.value("#ff0055")   # Red/Bearish
+        ),
+        tooltip=['date:T', 'open', 'high', 'low', 'close', 'volume']
+    )
+
+    chart = (rule + bar).properties(
+        height=350, 
+        title=alt.TitleParams(text=f"{ticker} • 5-Day Intraday", color='white')
+    ).configure_view(
+        strokeWidth=0
+    ).configure(
+        background='transparent'
+    )
+    
+    return chart
 
 # --- Main UI ---
 
@@ -358,7 +360,7 @@ if selected_sector:
                 # Chart
                 chart = plot_candle_chart(selected_ticker, live_data)
                 if chart:
-                    st.plotly_chart(chart, use_container_width=True, config={'displayModeBar': False})
+                    st.altair_chart(chart, use_container_width=True)
                 
                 # Additional Stats (Mocked for visual completeness, but could be real)
                 st.markdown("#### Key Statistics")
@@ -378,4 +380,4 @@ if selected_sector:
 
 # Footer
 st.markdown("---")
-st.caption("Theme Tracker Pro v2.0 | Built with Streamlit & Plotly")
+st.caption("Theme Tracker Pro v2.0 | Built with Streamlit & Altair")
