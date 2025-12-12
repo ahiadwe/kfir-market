@@ -192,6 +192,10 @@ c1, c2 = st.columns([4, 2])
 with c1:
     # Chips for Sectors (Using radio looking like pills)
     selected_sector = st.pills("Select Sector", list(SECTORS.keys()), default="📊 Overview")
+    # Fix for KeyError: Ensure selected_sector is never None
+    if not selected_sector:
+        selected_sector = "📊 Overview"
+        
 with c2:
     timeframe = st.segmented_control("Timeframe", ["1D", "1W", "1M", "3M", "1Y"], default="1D")
 
@@ -233,7 +237,7 @@ if selected_sector == "📊 Overview":
             ),
         },
         hide_index=True,
-        use_container_width=True,
+        width="stretch", # Replaced use_container_width based on warning
         height=600
     )
 
@@ -287,7 +291,7 @@ else:
                 "Vol Str": st.column_config.TextColumn("Volume")
             },
             hide_index=True,
-            use_container_width=True,
+            width="stretch", # Replaced use_container_width based on warning
             height=700
         )
     else:
