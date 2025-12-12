@@ -227,10 +227,10 @@ with st.spinner(f"Fetching market data for {len(target_tickers)} stocks..."):
 if st.session_state.page == "Overview":
     st.subheader("Market Sectors Overview")
     
-    # Create a summary dataframe
-    sector_stats = []
+    # Grid Layout for more compact display (3 columns)
+    cols = st.columns(3)
     
-    for sec in SECTORS:
+    for i, sec in enumerate(SECTORS):
         sec_tickers = sp500_df[sp500_df['Sector'] == sec]['Ticker'].tolist()
         
         # Calculate average performance for the sector (using available data)
@@ -243,23 +243,28 @@ if st.session_state.page == "Overview":
                 count += 1
         
         avg_1d = total_1d / count if count > 0 else 0.0
-        color = "#4CAF50" if avg_1d >= 0 else "#FF4B4B"
+        color_hex = "#4CAF50" if avg_1d >= 0 else "#FF4B4B"
         
-        # Display Card
-        with st.container():
-            c1, c2, c3 = st.columns([3, 1, 1])
-            with c1:
-                st.markdown(f"### {sec}")
-                st.caption(f"{count} Stocks")
-            with c2:
-                st.metric("Avg Daily", f"{avg_1d:.2%}")
-            with c3:
-                st.write("")
-                if st.button(f"View {sec} ➔", key=f"nav_{sec}"):
+        # Select current column in the grid
+        with cols[i % 3]:
+            with st.container():
+                st.markdown(f"""
+                <div style="background-color: #1E1E24; padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid {color_hex};">
+                    <h4 style="margin: 0; font-size: 1.0rem;">{sec}</h4>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
+                        <span style="color: #8b949e; font-size: 0.8rem;">{count} Stocks</span>
+                        <span style="font-weight: bold; color: {color_hex}; font-size: 1.1rem;">{avg_1d:+.2%}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Compact button
+                if st.button(f"Details ➔", key=f"nav_{sec}", use_container_width=True):
                     st.session_state.selected_sector = sec
                     st.session_state.page = "Sector Detail"
                     st.rerun()
-            st.divider()
+                
+                st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
 
 # --- VIEW: SECTOR DETAIL ---
 elif st.session_state.page == "Sector Detail":
