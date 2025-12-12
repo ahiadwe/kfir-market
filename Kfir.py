@@ -155,7 +155,7 @@ COMPANY_NAMES = {
 ALL_TICKERS = list(set([t for s in SECTORS.values() for t in s]))
 
 # --- Data Engine ---
-@st.cache_data(ttl=900)  # Cache for 15 minutes (900s) to avoid rate limits
+@st.cache_data(ttl=900)  # Cache for 15 minutes
 def fetch_data():
     """Fetches 1y data to calculate multiple timeframes."""
     try:
@@ -233,11 +233,13 @@ def get_detailed_metrics(ticker, live_df):
 
 # --- Main UI ---
 
-# Initialize Session State for Sector Selection
+# Initialize Session State
 if 'selected_sector' not in st.session_state:
     st.session_state.selected_sector = list(SECTORS.keys())[0]
+if 'active_tab' not in st.session_state:
+    st.session_state.active_tab = "Overview"
 
-# Header with Refresh Button
+# Header
 col_header, col_btn = st.columns([6, 1])
 with col_header:
     st.title("Theme Tracker Pro")
@@ -292,60 +294,71 @@ with tab_overview:
     if not df_overview.empty:
         df_overview = df_overview.sort_values("Daily", ascending=False)
         
-        # Apply Pandas Styling for diverging bars (Green/Red)
+        # --- SELECTION & NAVIGATION ---
+        # Display clickable button for navigation
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            st.info("👇 Select a sector below to see the 'Go to Detail' button.")
+        
+        # Apply Pandas Styling
         styler_overview = df_overview.style.format({
             "Daily": "{:+.2%}",
             "YTD": "{:+.2%}"
         }).bar(
             subset=["Daily"],
-            align=0,  # Align bars at 0 (center)
-            color=['#FF4B4B', '#4CAF50'],  # [Negative(Red), Positive(Green)]
+            align=0,
+            color=['#FF4B4B', '#4CAF50'],
             vmin=-0.05,
             vmax=0.05
         )
 
-        # Interactive Dataframe to allow selection
+        # Interactive Dataframe
         event = st.dataframe(
             styler_overview,
             column_config={
                 "Theme / Sector": st.column_config.TextColumn("Theme / Sector", width="large"),
-                "Daily": st.column_config.NumberColumn("Daily Performance"),
+                "Daily": st.column_config.Column("Daily Performance"), # Use generic Column to avoid overriding Styler
                 "YTD": st.column_config.NumberColumn("YTD Return"),
                 "Count": st.column_config.NumberColumn("Tickers", format="%d")
             },
             hide_index=True,
             width="stretch",
-            height=800,
+            height=600,
             on_select="rerun",
             selection_mode="single-row"
         )
         
-        # Handle Selection
+        # Handle Selection Button
         if len(event.selection.rows) > 0:
             selected_row_idx = event.selection.rows[0]
-            # Since df is sorted, we use iloc on the sorted df
             new_sector = df_overview.iloc[selected_row_idx]["Theme / Sector"]
             
-            if st.session_state.selected_sector != new_sector:
-                st.session_state.selected_sector = new_sector
-                st.toast(f"Selected: {new_sector}. Please switch to 'Sector Detail' tab.", icon="✅")
+            # Update state immediately
+            st.session_state.selected_sector = new_sector
+            
+            # Show a prominent button to jump
+            with c2:
+                if st.button(f"🔍 View Top 10 for {new_sector}", type="primary"):
+                    # Switch tab is tricky in Streamlit purely programmatically without extra components,
+                    # so we instruct user or use a visual cue.
+                    st.toast(f"Switched to {new_sector} details! Please click the 'Sector Detail' tab.", icon="🚀")
 
 # --- TAB 2: SECTOR DETAIL ---
 with tab_detail:
-    # Determine index for selectbox based on session state
+    # Determine index based on session state
     try:
         current_sector_idx = list(SECTORS.keys()).index(st.session_state.selected_sector)
     except ValueError:
         current_sector_idx = 0
 
-    col_sel, col_tf, col_blank = st.columns([2, 1, 1])
+    # Controls
+    col_sel, col_tf, col_limit, col_blank = st.columns([2, 1, 1, 1])
     with col_sel:
         selected_sector = st.selectbox(
             "Select Sector", 
             list(SECTORS.keys()), 
             index=current_sector_idx
         )
-        # Update session state if manually changed here
         st.session_state.selected_sector = selected_sector
 
     with col_tf:
@@ -358,6 +371,9 @@ with tab_detail:
         selected_tf_label = st.selectbox("Ranking Timeframe", list(timeframe_options.keys()))
         selected_tf_col = timeframe_options[selected_tf_label]
 
+    with col_limit:
+        show_top_10 = st.checkbox("Show Top 10 Only", value=True)
+
     if selected_sector:
         tickers = SECTORS[selected_sector]
         rows = []
@@ -369,7 +385,6 @@ with tab_detail:
         for t in tickers:
             m = get_detailed_metrics(t, live_data)
             if m:
-                # Construct Logo URL (using parqet as a public source)
                 clean_ticker = t.replace(".", "-") if "." in t else t
                 logo_url = f"https://assets.parqet.com/logos/symbol/{clean_ticker}?format=png"
 
@@ -383,7 +398,6 @@ with tab_detail:
                     "1M %": m['1m'],
                     "YTD %": m['ytd']
                 })
-                # Accumulate for averages
                 sec_1d += m['1d']
                 sec_1w += m['1w']
                 sec_1m += m['1m']
@@ -406,7 +420,11 @@ with tab_detail:
             # Sort by the selected timeframe column
             df_detail = df_detail.sort_values(selected_tf_col, ascending=False)
             
-            # Apply styling to detail view with dynamic column selection
+            # Apply Top 10 Filter
+            if show_top_10:
+                df_detail = df_detail.head(10)
+            
+            # Apply styling to detail view
             styler_detail = df_detail.style.format({
                 "1D %": "{:+.2%}",
                 "1W %": "{:+.2%}",
@@ -428,10 +446,11 @@ with tab_detail:
                     "Symbol": st.column_config.TextColumn("Symbol", width="small"),
                     "Name": st.column_config.TextColumn("Company Name", width="medium"),
                     "Price": st.column_config.NumberColumn("Price"),
-                    "1D %": st.column_config.NumberColumn("1 Day"),
-                    "1W %": st.column_config.NumberColumn("1 Week"),
-                    "1M %": st.column_config.NumberColumn("1 Month"),
-                    "YTD %": st.column_config.NumberColumn("YTD"),
+                    # Generic Column config avoids overriding the Pandas Styler colors
+                    "1D %": st.column_config.Column("1 Day"),
+                    "1W %": st.column_config.Column("1 Week"),
+                    "1M %": st.column_config.Column("1 Month"),
+                    "YTD %": st.column_config.Column("YTD"),
                 },
                 hide_index=True,
                 width="stretch",
