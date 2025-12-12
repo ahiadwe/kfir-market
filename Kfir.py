@@ -45,21 +45,52 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# --- Constants: Fallback Data ---
+# Used if live scraping fails (e.g., missing lxml dependency)
+FALLBACK_SECTORS = {
+    "Magnificent 7 & Big Tech": ["MSFT", "AAPL", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "ORCL", "IBM", "CSCO"],
+    "Semiconductors": ["TSM", "AVGO", "AMD", "QCOM", "TXN", "MU", "INTC", "ARM", "AMAT", "LRCX", "ADI"],
+    "Software (SaaS) & Cloud": ["CRM", "NOW", "ADBE", "SNOW", "DDOG", "PLTR", "MDB", "ZS", "NET", "WDAY", "HUBS", "TEAM"],
+    "Cybersecurity": ["PANW", "CRWD", "FTNT", "OKTA", "CYBR", "GEN", "TENB", "S", "CHKP"],
+    "Fintech & Payments": ["V", "MA", "PYPL", "SQ", "COIN", "HOOD", "AFRM", "FI", "FIS", "GPN", "TOST"],
+    "Banking & Finance": ["JPM", "BAC", "WFC", "C", "MS", "GS", "SCHW", "BLK", "AXP", "USB", "PNC"],
+    "Healthcare & Pharma": ["LLY", "JNJ", "ABBV", "MRK", "PFE", "AMGN", "BMY", "GILD", "VRTX", "REGN", "NVO"],
+    "MedTech & Devices": ["TMO", "ABT", "MDT", "ISRG", "SYK", "BSX", "EW", "DXCM", "ZBH", "BDX", "GEHC"],
+    "Consumer Discretionary": ["HD", "MCD", "NKE", "SBUX", "TGT", "LOW", "TJX", "LULU", "CMG", "YUM", "EBAY"],
+    "Consumer Staples": ["WMT", "COST", "PG", "KO", "PEP", "PM", "MO", "CL", "EL", "K", "GIS", "MNST"],
+    "Automotive & EV": ["TM", "F", "GM", "HMC", "STLA", "RIVN", "LCID", "LI", "NIO", "XPEV"],
+    "Aerospace & Defense": ["RTX", "LMT", "BA", "NOC", "GD", "LHX", "GE", "TDG", "AXON", "HII"],
+    "Industrials & Logistics": ["CAT", "DE", "UNP", "UPS", "HON", "ETN", "ITW", "WM", "MMM", "FDX", "CSX"],
+    "Energy (Oil & Gas)": ["XOM", "CVX", "SHEL", "TTE", "COP", "BP", "SLB", "EOG", "OXY", "MPC", "VLO"],
+    "Clean Tech & Utilities": ["NEE", "DU", "SO", "AEP", "SRE", "D", "PEG", "FSLR", "ENPH", "SEDG", "PLUG"],
+    "Materials & Mining": ["LIN", "SCCO", "FCX", "NEM", "SHW", "APD", "DD", "CTVA", "ALB", "NUE", "DOW"],
+    "Real Estate (REITs)": ["PLD", "AMT", "EQIX", "CCI", "O", "SPG", "PSA", "WELL", "DLR", "VICI"],
+    "Media & Telecom": ["NFLX", "DIS", "TMUS", "VZ", "T", "CMCSA", "CHTR", "WBD", "SPOT", "LYV", "PARA"],
+    "Travel & Leisure": ["BKNG", "ABNB", "MAR", "HLT", "DAL", "UAL", "RCL", "CCL", "LUV", "EXPE", "LVS"]
+}
+
 # --- Data Engine: Dynamic Fetching ---
 
 @st.cache_data(ttl=86400) # Cache S&P 500 list for 24 hours
 def get_sp500_components():
-    """Fetches the current S&P 500 constituents and sectors from Wikipedia."""
+    """Fetches S&P 500 constituents. Falls back to curated list if scraping fails."""
     try:
         url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+        # Try reading HTML. If lxml is missing, pandas might fail or try bs4 if available.
+        # We catch the error to ensure the app doesn't crash.
         tables = pd.read_html(url)
         df = tables[0]
         # Clean up column names
         df = df.rename(columns={'Symbol': 'Ticker', 'GICS Sector': 'Sector', 'Security': 'Name'})
         return df[['Ticker', 'Name', 'Sector']]
     except Exception as e:
-        st.error(f"Error fetching S&P 500 list: {e}")
-        return pd.DataFrame(columns=['Ticker', 'Name', 'Sector'])
+        # Fallback logic
+        rows = []
+        for sector, tickers in FALLBACK_SECTORS.items():
+            for t in tickers:
+                rows.append({"Ticker": t, "Name": t, "Sector": sector})
+        
+        return pd.DataFrame(rows)
 
 @st.cache_data(ttl=900)  # Cache market data for 15 minutes
 def fetch_market_data(tickers):
@@ -134,11 +165,12 @@ def get_detailed_metrics(ticker, live_df):
 
 # --- App Initialization ---
 
-# 1. Fetch S&P 500 Components (Dynamic Source)
-with st.spinner("Fetching S&P 500 Constituents..."):
+# 1. Fetch S&P 500 Components (Dynamic Source with Fallback)
+with st.spinner("Fetching Market Constituents..."):
     sp500_df = get_sp500_components()
 
 if sp500_df.empty:
+    st.error("Failed to load market data. Please try again later.")
     st.stop()
 
 # 2. Organize by Sector
@@ -182,9 +214,6 @@ with st.sidebar:
 # To avoid fetching 500 stocks at once (slow), we fetch based on the view.
 
 if st.session_state.page == "Overview":
-    # For overview, we might pick top 3-5 stocks per sector as proxies, or just fetch all (might be slow).
-    # Let's fetch Top 5 by market cap (approximated by list order usually) for each sector to be fast.
-    # Actually, fetching 500 tickers for 1y history is heavy.
     # Strategy: Fetch ALL data once (cached) to enable fast switching.
     target_tickers = sp500_df['Ticker'].tolist()
 else:
@@ -238,6 +267,10 @@ elif st.session_state.page == "Sector Detail":
     # Controls Area
     c_sel, c_tf, c_top = st.columns([2, 1, 1])
     with c_sel:
+        # Ensure selected_sector is in the current list
+        if st.session_state.selected_sector not in SECTORS:
+            st.session_state.selected_sector = SECTORS[0]
+            
         selected_sector = st.selectbox("Select Sector", SECTORS, index=SECTORS.index(st.session_state.selected_sector))
         st.session_state.selected_sector = selected_sector
         
@@ -257,7 +290,10 @@ elif st.session_state.page == "Sector Detail":
     
     for t in sec_tickers:
         m = get_detailed_metrics(t, live_data)
-        name = sp500_df[sp500_df['Ticker'] == t]['Name'].values[0]
+        # Handle cases where Name might not be available in live fetch
+        name_series = sp500_df[sp500_df['Ticker'] == t]['Name']
+        name = name_series.values[0] if not name_series.empty else t
+        
         if m:
             clean_ticker = t.replace(".", "-")
             logo_url = f"https://assets.parqet.com/logos/symbol/{clean_ticker}?format=png"
