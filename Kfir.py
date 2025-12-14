@@ -2,388 +2,323 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import datetime
-import altair as alt
+import pytz
+import time
 
 # --- Configuration ---
 st.set_page_config(
-    page_title="Theme Tracker Pro",
+    page_title="Theme Tracker Live",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed" # Starts closed on mobile (good for focus)
 )
 
-# --- Custom CSS (Clean Dark Theme) ---
+# Force Dark Theme & Mobile CSS Optimization
 st.markdown("""
 <style>
-    /* Main Background */
-    .stApp {
+    /* Dark Theme Colors */
+    [data-testid="stAppViewContainer"] {
         background-color: #0b0c15;
         color: #ffffff;
     }
-    
-    /* Clean DataFrame styling */
-    div[data-testid="stDataFrame"] {
+    [data-testid="stHeader"] {
+        background-color: #0b0c15;
+    }
+    [data-testid="stSidebar"] {
         background-color: #151621;
-        border-radius: 8px;
-        padding: 10px;
+        border-right: 1px solid #222335;
     }
     
     /* Metrics Styling */
-    div[data-testid="stMetricValue"] {
-        font-size: 24px;
-        color: #ffffff;
+    div[data-testid="metric-container"] {
+        background-color: #151621;
+        border: 1px solid #222335;
+        padding: 10px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     }
-    div[data-testid="stMetricLabel"] {
-        color: #8b949e;
+    
+    /* Mobile Optimizations */
+    @media (max-width: 768px) {
+        .block-container {
+            padding-top: 2rem !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
+        h1 {
+            font-size: 1.8rem !important;
+        }
+        /* Make dataframe headers smaller on mobile */
+        th {
+            font-size: 0.8rem !important;
+        }
     }
 
-    /* Remove standard padding */
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-    }
+    /* Hide Streamlit Branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
-# --- Constants: Fallback Data ---
-# Used if live scraping fails (e.g., missing lxml dependency)
-FALLBACK_SECTORS = {
-    "Magnificent 7 & Big Tech": ["MSFT", "AAPL", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "ORCL", "IBM", "CSCO"],
-    "Semiconductors": ["TSM", "AVGO", "AMD", "QCOM", "TXN", "MU", "INTC", "ARM", "AMAT", "LRCX", "ADI"],
-    "Software (SaaS) & Cloud": ["CRM", "NOW", "ADBE", "SNOW", "DDOG", "PLTR", "MDB", "ZS", "NET", "WDAY", "HUBS", "TEAM"],
-    "Cybersecurity": ["PANW", "CRWD", "FTNT", "OKTA", "CYBR", "GEN", "TENB", "S", "CHKP"],
-    "Fintech & Payments": ["V", "MA", "PYPL", "SQ", "COIN", "HOOD", "AFRM", "FI", "FIS", "GPN", "TOST"],
-    "Banking & Finance": ["JPM", "BAC", "WFC", "C", "MS", "GS", "SCHW", "BLK", "AXP", "USB", "PNC"],
-    "Healthcare & Pharma": ["LLY", "JNJ", "ABBV", "MRK", "PFE", "AMGN", "BMY", "GILD", "VRTX", "REGN", "NVO"],
-    "MedTech & Devices": ["TMO", "ABT", "MDT", "ISRG", "SYK", "BSX", "EW", "DXCM", "ZBH", "BDX", "GEHC"],
-    "Consumer Discretionary": ["HD", "MCD", "NKE", "SBUX", "TGT", "LOW", "TJX", "LULU", "CMG", "YUM", "EBAY"],
-    "Consumer Staples": ["WMT", "COST", "PG", "KO", "PEP", "PM", "MO", "CL", "EL", "K", "GIS", "MNST"],
-    "Automotive & EV": ["TM", "F", "GM", "HMC", "STLA", "RIVN", "LCID", "LI", "NIO", "XPEV"],
-    "Aerospace & Defense": ["RTX", "LMT", "BA", "NOC", "GD", "LHX", "GE", "TDG", "AXON", "HII"],
-    "Industrials & Logistics": ["CAT", "DE", "UNP", "UPS", "HON", "ETN", "ITW", "WM", "MMM", "FDX", "CSX"],
-    "Energy (Oil & Gas)": ["XOM", "CVX", "SHEL", "TTE", "COP", "BP", "SLB", "EOG", "OXY", "MPC", "VLO"],
-    "Clean Tech & Utilities": ["NEE", "DU", "SO", "AEP", "SRE", "D", "PEG", "FSLR", "ENPH", "SEDG", "PLUG"],
-    "Materials & Mining": ["LIN", "SCCO", "FCX", "NEM", "SHW", "APD", "DD", "CTVA", "ALB", "NUE", "DOW"],
-    "Real Estate (REITs)": ["PLD", "AMT", "EQIX", "CCI", "O", "SPG", "PSA", "WELL", "DLR", "VICI"],
-    "Media & Telecom": ["NFLX", "DIS", "TMUS", "VZ", "T", "CMCSA", "CHTR", "WBD", "SPOT", "LYV", "PARA"],
-    "Travel & Leisure": ["BKNG", "ABNB", "MAR", "HLT", "DAL", "UAL", "RCL", "CCL", "LUV", "EXPE", "LVS"]
+# --- Constants & Data ---
+SECTORS = {
+    "📊 Overview": [], 
+    "💾 Semiconductors": ["NVDA", "AMD", "INTC", "TSM", "AVGO", "QCOM", "MU", "TXN"],
+    "🚗 EV & Mobility": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "ON"],
+    "☁️ Cloud & SaaS": ["MSFT", "ADBE", "CRM", "SNOW", "DDOG", "NOW", "WDAY", "ZS"],
+    "🛡️ Cybersecurity": ["PANW", "CRWD", "FTNT", "OKTA", "CYBR", "S", "NET"],
+    "🤖 AI & Robotics": ["ISRG", "PATH", "IRBT", "UPST", "PLTR", "AI", "GOOGL"],
+    "🛒 E-Commerce": ["AMZN", "BABA", "JD", "SHOP", "MELI", "EBAY", "ETSY"],
+    "🧬 Biotech": ["PFE", "MRNA", "BNTX", "LLY", "UNH", "JNJ", "ABBV"],
+    "💳 Fintech": ["PYPL", "AXP", "COIN", "AFRM", "V", "MA", "HOOD"],
+    "⚡ Energy": ["XOM", "CVX", "SHEL", "BP", "COP", "SLB"],
+    "🛍️ Retail": ["WMT", "TGT", "COST", "HD", "LOW", "NKE", "SBUX"],
+    "📺 Media": ["NFLX", "DIS", "CMCSA", "WBD", "PARA", "SPOT"],
+    "✈️ Travel": ["BKNG", "ABNB", "MAR", "DAL", "UAL", "CCL", "RCL"],
+    "⚔️ Defense": ["RTX", "LMT", "BA", "NOC", "GD"],
+    "🎮 Gaming": ["TTWO", "EA", "RBLX", "U", "SONY", "NTDOY"],
+    "🏠 Real Estate": ["PLD", "AMT", "EQIX", "O", "SPG"]
 }
 
-# --- Data Engine: Dynamic Fetching ---
+# Mapping Tickers to Company Names
+COMPANY_NAMES = {
+    "NVDA": "NVIDIA", "AMD": "Adv. Micro Devices", "INTC": "Intel", "TSM": "TSMC", "AVGO": "Broadcom", "QCOM": "Qualcomm", "MU": "Micron", "TXN": "Texas Inst.",
+    "TSLA": "Tesla", "RIVN": "Rivian", "LCID": "Lucid", "NIO": "NIO Inc", "XPEV": "XPeng", "GM": "GM", "F": "Ford", "ON": "ON Semi",
+    "MSFT": "Microsoft", "ADBE": "Adobe", "CRM": "Salesforce", "SNOW": "Snowflake", "DDOG": "Datadog", "NOW": "ServiceNow", "WDAY": "Workday", "ZS": "Zscaler",
+    "PANW": "Palo Alto", "CRWD": "CrowdStrike", "FTNT": "Fortinet", "OKTA": "Okta", "CYBR": "CyberArk", "S": "SentinelOne", "NET": "Cloudflare",
+    "ISRG": "Intuitive Surg.", "PATH": "UiPath", "IRBT": "iRobot", "UPST": "Upstart", "PLTR": "Palantir", "AI": "C3.ai", "GOOGL": "Google",
+    "AMZN": "Amazon", "BABA": "Alibaba", "JD": "JD.com", "SHOP": "Shopify", "MELI": "MercadoLibre", "EBAY": "eBay", "ETSY": "Etsy",
+    "PFE": "Pfizer", "MRNA": "Moderna", "BNTX": "BioNTech", "LLY": "Eli Lilly", "UNH": "UnitedHealth", "JNJ": "J&J", "ABBV": "AbbVie",
+    "PYPL": "PayPal", "AXP": "Amex", "COIN": "Coinbase", "AFRM": "Affirm", "V": "Visa", "MA": "Mastercard", "HOOD": "Robinhood",
+    "XOM": "Exxon", "CVX": "Chevron", "SHEL": "Shell", "BP": "BP", "COP": "ConocoPhillips", "SLB": "Schlumberger",
+    "WMT": "Walmart", "TGT": "Target", "COST": "Costco", "HD": "Home Depot", "LOW": "Lowe's", "NKE": "Nike", "SBUX": "Starbucks",
+    "NFLX": "Netflix", "DIS": "Disney", "CMCSA": "Comcast", "WBD": "Warner Bros", "PARA": "Paramount", "SPOT": "Spotify",
+    "BKNG": "Booking", "ABNB": "Airbnb", "MAR": "Marriott", "DAL": "Delta", "UAL": "United", "CCL": "Carnival", "RCL": "Royal Caribbean",
+    "RTX": "Raytheon", "LMT": "Lockheed", "BA": "Boeing", "NOC": "Northrop", "GD": "General Dyn.",
+    "TTWO": "Take-Two", "EA": "Electronic Arts", "RBLX": "Roblox", "U": "Unity", "SONY": "Sony", "NTDOY": "Nintendo",
+    "PLD": "Prologis", "AMT": "American Tower", "EQIX": "Equinix", "O": "Realty Income", "SPG": "Simon Prop."
+}
 
-@st.cache_data(ttl=86400) # Cache S&P 500 list for 24 hours
-def get_sp500_components():
-    """Fetches S&P 500 constituents. Falls back to curated list if scraping fails."""
-    try:
-        url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
-        # Try reading HTML. If lxml is missing, pandas might fail or try bs4 if available.
-        # We catch the error to ensure the app doesn't crash.
-        tables = pd.read_html(url)
-        df = tables[0]
-        # Clean up column names
-        df = df.rename(columns={'Symbol': 'Ticker', 'GICS Sector': 'Sector', 'Security': 'Name'})
-        return df[['Ticker', 'Name', 'Sector']]
-    except Exception as e:
-        # Fallback logic
-        rows = []
-        for sector, tickers in FALLBACK_SECTORS.items():
-            for t in tickers:
-                rows.append({"Ticker": t, "Name": t, "Sector": sector})
-        
-        return pd.DataFrame(rows)
+INDICES_MAP = {"^GSPC": "S&P 500", "^IXIC": "Nasdaq", "BTC-USD": "Bitcoin"}
+INDICES = list(INDICES_MAP.keys())
 
-@st.cache_data(ttl=900)  # Cache market data for 15 minutes
-def fetch_market_data(tickers):
-    """Fetches 1y data for a list of tickers to calculate multiple timeframes."""
-    if not tickers:
-        return pd.DataFrame()
-    try:
-        # Download 1 year of data
-        data = yf.download(
-            tickers, 
-            period="1y", 
-            group_by='ticker', 
-            threads=True,
-            progress=False,
-            auto_adjust=False
-        )
-        return data
-    except Exception as e:
-        st.error(f"API Error: {e}")
-        return pd.DataFrame()
+# Helper to flatten list
+def get_all_tickers():
+    all_t = []
+    for s in SECTORS.values():
+        all_t.extend(s)
+    return list(set(all_t + INDICES))
 
-def calculate_change(closes, days_back):
-    """Helper to calculate % change given a series and days back."""
-    if len(closes) < days_back + 1:
-        return 0.0
+# --- Data Fetching ---
+@st.cache_data(ttl=300) 
+def fetch_market_data():
+    tickers = get_all_tickers()
+    if not tickers: return pd.DataFrame(), pd.DataFrame()
     
-    current = float(closes.iloc[-1])
-    idx = max(0, len(closes) - 1 - days_back)
-    prev = float(closes.iloc[idx])
-    
-    if prev == 0: return 0.0
-    return (current - prev) / prev
-
-def get_detailed_metrics(ticker, live_df):
-    """Extracts Price, 1D, 1W, 1M, YTD."""
     try:
-        # Handle MultiIndex columns
-        if ticker not in live_df.columns.levels[0]: 
-            return None
-        
-        t_data = live_df[ticker]
-        closes = t_data['Close'].dropna()
-        
-        if len(closes) < 2: 
-            return None
-        
-        current_price = float(closes.iloc[-1])
-        
-        # Calculate periods
-        change_1d = calculate_change(closes, 1)
-        change_1w = calculate_change(closes, 5)
-        change_1m = calculate_change(closes, 21)
-        
-        # YTD calculation
-        current_year = datetime.datetime.now().year
-        ytd_closes = closes[closes.index.year == current_year]
-        if not ytd_closes.empty:
-            start_price = float(ytd_closes.iloc[0])
-            change_ytd = (current_price - start_price) / start_price if start_price != 0 else 0.0
-        else:
-            change_ytd = 0.0
-
-        return {
-            "price": current_price,
-            "1d": change_1d,
-            "1w": change_1w,
-            "1m": change_1m,
-            "ytd": change_ytd
-        }
+        # Live Data (5d, 15m)
+        live_data = yf.download(tickers, period="5d", interval="15m", prepost=True, group_by='ticker', threads=True, progress=False, auto_adjust=False)
     except Exception:
-        return None
+        live_data = pd.DataFrame()
 
-# --- App Initialization ---
+    time.sleep(1) 
 
-# 1. Fetch S&P 500 Components (Dynamic Source with Fallback)
-with st.spinner("Fetching Market Constituents..."):
-    sp500_df = get_sp500_components()
+    try:
+        # Daily Data (1y)
+        daily_data = yf.download(tickers, period="1y", group_by='ticker', threads=True, progress=False, auto_adjust=False)
+    except:
+        daily_data = pd.DataFrame()
+        
+    return live_data, daily_data
 
-if sp500_df.empty:
-    st.error("Failed to load market data. Please try again later.")
-    st.stop()
+def calculate_metrics(ticker, live_df, daily_df, timeframe="1D"):
+    try:
+        t_live = live_data[ticker] if ticker in live_data.columns.levels[0] else pd.DataFrame()
+        t_daily = daily_data[ticker] if ticker in daily_data.columns.levels[0] else pd.DataFrame()
+    except: return None
 
-# 2. Organize by Sector
-SECTORS = sp500_df['Sector'].unique().tolist()
-SECTORS.sort()
+    if t_daily.empty: return None
 
-# Initialize Session State
-if 'selected_sector' not in st.session_state:
-    st.session_state.selected_sector = SECTORS[0]
-if 'page' not in st.session_state:
-    st.session_state.page = "Overview"
+    current_price = 0.0
+    is_extended = False
+    
+    # 1. Try to get latest price from Live data (includes pre/post)
+    if not t_live.empty:
+        valid_live = t_live['Close'].dropna()
+        if not valid_live.empty:
+            current_price = float(valid_live.iloc[-1])
+            # Check for Extended Hours
+            last_dt = valid_live.index[-1]
+            if last_dt.tzinfo is None:
+                last_dt = last_dt.replace(tzinfo=pytz.timezone('US/Eastern'))
+            else:
+                last_dt = last_dt.astimezone(pytz.timezone('US/Eastern'))
+            
+            h, m = last_dt.hour, last_dt.minute
+            if (h < 9) or (h == 9 and m < 30) or (h >= 16):
+                is_extended = True
+    
+    # 2. Fallback to Daily
+    if current_price == 0 and not t_daily.empty:
+        current_price = float(t_daily['Close'].iloc[-1])
 
-# --- Sidebar Navigation ---
+    # 3. Calculate Reference Price
+    start_price = current_price
+    closes = t_daily['Close'].dropna()
+    
+    if timeframe == "1D":
+        if len(closes) >= 2: start_price = float(closes.iloc[-2])
+    else:
+        lb_map = {"1W": 5, "1M": 21, "3M": 63, "1Y": 252}
+        lb = lb_map.get(timeframe, 5)
+        if len(closes) > lb: start_price = float(closes.iloc[-(lb+1)])
+        elif not closes.empty: start_price = float(closes.iloc[0])
+
+    change_pct = ((current_price - start_price) / start_price) * 100 if start_price else 0
+    
+    vol = 0
+    if 'Volume' in t_daily.columns:
+        try:
+            v = t_daily['Volume'].iloc[-1]
+            if pd.notna(v): vol = int(v)
+        except: vol = 0
+
+    return {
+        "Ticker": ticker,
+        "Price": current_price,
+        "Change": change_pct,
+        "Volume": vol,
+        "Extended": is_extended,
+        "History": closes.tolist()[-30:]
+    }
+
+def format_volume(num):
+    if num > 1_000_000_000: return f"{num/1_000_000_000:.1f}B"
+    if num > 1_000_000: return f"{num/1_000_000:.1f}M"
+    if num > 1_000: return f"{num/1_000:.1f}K"
+    return str(num)
+
+# --- UI Layout ---
+
+# Sidebar Navigation (Mobile Drawer)
 with st.sidebar:
-    st.title("Theme Tracker Pro")
-    st.write(f"Tracking **{len(sp500_df)}** stocks across **{len(SECTORS)}** sectors.")
-    
-    # Navigation Mode
-    nav_selection = st.radio(
-        "Navigation", 
-        ["Overview", "Sector Detail"], 
-        index=0 if st.session_state.page == "Overview" else 1
-    )
-    
-    # Update state based on radio selection
-    if nav_selection != st.session_state.page:
-        st.session_state.page = nav_selection
-        st.rerun()
-    
+    st.title("⚙️ Controls")
     st.markdown("---")
     
-    # Refresh Button
-    if st.button("🔄 Refresh Market Data", use_container_width=True):
+    # Controls moved here for mobile space efficiency
+    if st.button("🔄 Refresh Data", type="primary", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
+        
+    st.markdown("### Navigation")
+    selected_sector = st.pills("Select Sector", list(SECTORS.keys()), default="📊 Overview")
+    if not selected_sector: selected_sector = "📊 Overview"
     
+    st.markdown("### Settings")
+    timeframe = st.segmented_control("Timeframe", ["1D", "1W", "1M", "3M", "1Y"], default="1D")
+    
+    st.markdown("---")
     st.caption(f"Last updated: {datetime.datetime.now().strftime('%H:%M:%S')}")
 
-# --- Logic for Data Fetching ---
-# We need to fetch data for the relevant stocks.
-# To avoid fetching 500 stocks at once (slow), we fetch based on the view.
+# Main Content Area
+st.title("⚡ Theme Tracker")
 
-if st.session_state.page == "Overview":
-    # Strategy: Fetch ALL data once (cached) to enable fast switching.
-    target_tickers = sp500_df['Ticker'].tolist()
-else:
-    # Fetch only selected sector
-    target_tickers = sp500_df[sp500_df['Sector'] == st.session_state.selected_sector]['Ticker'].tolist()
+# 1. Market Pulse Ticker (Top Row)
+with st.spinner("Loading Market Pulse..."):
+    live_data, daily_data = fetch_market_data()
 
-with st.spinner(f"Fetching market data for {len(target_tickers)} stocks..."):
-    live_data = fetch_market_data(target_tickers)
+# Calculate Indices Metrics
+idx_cols = st.columns(3)
+for i, idx in enumerate(INDICES):
+    m = calculate_metrics(idx, live_data, daily_data, "1D") # Always 1D for pulse
+    if m:
+        name = INDICES_MAP[idx]
+        with idx_cols[i]:
+            st.metric(label=name, value=f"${m['Price']:,.2f}", delta=f"{m['Change']:.2f}%")
 
-# --- VIEW: OVERVIEW ---
-if st.session_state.page == "Overview":
-    st.subheader("Market Sectors Overview")
+st.markdown("---")
+
+# 2. Main Content Logic
+if selected_sector == "📊 Overview":
+    st.subheader("Market Heatmap")
     
-    # Grid Layout for more compact display (3 columns)
-    cols = st.columns(3)
-    
-    for i, sec in enumerate(SECTORS):
-        sec_tickers = sp500_df[sp500_df['Sector'] == sec]['Ticker'].tolist()
+    sector_stats = []
+    for sec_name, tickers in SECTORS.items():
+        if sec_name == "📊 Overview": continue
         
-        # Calculate average performance for the sector (using available data)
-        total_1d = 0
+        total_change = 0
         count = 0
-        for t in sec_tickers:
-            m = get_detailed_metrics(t, live_data)
+        for t in tickers:
+            m = calculate_metrics(t, live_data, daily_data, timeframe)
             if m:
-                total_1d += m['1d']
+                total_change += m['Change']
                 count += 1
         
-        avg_1d = total_1d / count if count > 0 else 0.0
-        color_hex = "#4CAF50" if avg_1d >= 0 else "#FF4B4B"
-        
-        # Select current column in the grid
-        with cols[i % 3]:
-            with st.container():
-                st.markdown(f"""
-                <div style="background-color: #1E1E24; padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid {color_hex};">
-                    <h4 style="margin: 0; font-size: 1.0rem;">{sec}</h4>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
-                        <span style="color: #8b949e; font-size: 0.8rem;">{count} Stocks</span>
-                        <span style="font-weight: bold; color: {color_hex}; font-size: 1.1rem;">{avg_1d:+.2%}</span>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Compact button
-                if st.button(f"Details ➔", key=f"nav_{sec}", use_container_width=True):
-                    st.session_state.selected_sector = sec
-                    st.session_state.page = "Sector Detail"
-                    st.rerun()
-                
-                st.markdown("<div style='margin-bottom: 15px;'></div>", unsafe_allow_html=True)
-
-# --- VIEW: SECTOR DETAIL ---
-elif st.session_state.page == "Sector Detail":
+        avg = total_change / count if count > 0 else 0
+        sector_stats.append({"Sector": sec_name, "Avg Change": avg})
     
-    # Controls Area
-    c_sel, c_tf, c_top = st.columns([2, 1, 1])
-    with c_sel:
-        # Ensure selected_sector is in the current list
-        if st.session_state.selected_sector not in SECTORS:
-            st.session_state.selected_sector = SECTORS[0]
-            
-        selected_sector = st.selectbox("Select Sector", SECTORS, index=SECTORS.index(st.session_state.selected_sector))
-        st.session_state.selected_sector = selected_sector
-        
-    with c_tf:
-        timeframe_map = {"1 Day": "1d", "1 Week": "1w", "1 Month": "1m", "YTD": "ytd"}
-        tf_label = st.selectbox("Ranking Timeframe", list(timeframe_map.keys()))
-        tf_key = timeframe_map[tf_label]
-        
-    with c_top:
-        st.write("")
-        st.write("")
-        show_top = st.checkbox("Show Top 10 Only", value=True)
+    df_overview = pd.DataFrame(sector_stats).sort_values("Avg Change", ascending=False)
+    
+    st.dataframe(
+        df_overview,
+        column_config={
+            "Sector": st.column_config.TextColumn("Sector"),
+            "Avg Change": st.column_config.ProgressColumn(
+                "Performance",
+                format="%.2f%%",
+                min_value=-5,
+                max_value=5,
+            ),
+        },
+        hide_index=True,
+        width="stretch"
+    )
 
-    # Process Data for Table
-    sec_tickers = sp500_df[sp500_df['Sector'] == selected_sector]['Ticker'].tolist()
+else:
+    # Sector Detail View
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        st.subheader(f"{selected_sector}")
+    with c2:
+        search_term = st.text_input("Filter", placeholder="Symbol", label_visibility="collapsed")
+    
     rows = []
+    tickers = SECTORS[selected_sector]
     
-    for t in sec_tickers:
-        m = get_detailed_metrics(t, live_data)
-        # Handle cases where Name might not be available in live fetch
-        name_series = sp500_df[sp500_df['Ticker'] == t]['Name']
-        name = name_series.values[0] if not name_series.empty else t
+    for t in tickers:
+        if search_term and search_term.upper() not in t: continue
         
+        m = calculate_metrics(t, live_data, daily_data, timeframe)
         if m:
-            clean_ticker = t.replace(".", "-")
-            logo_url = f"https://assets.parqet.com/logos/symbol/{clean_ticker}?format=png"
+            icon = "☾" if m['Extended'] else ""
+            comp_name = COMPANY_NAMES.get(t, t)
+            # Shorten name for mobile
+            if len(comp_name) > 15: comp_name = comp_name[:15] + "..."
             
             rows.append({
-                "Logo": logo_url,
-                "Symbol": t,
-                "Name": name,
-                "Price": m['price'],
-                "1d": m['1d'],
-                "1w": m['1w'],
-                "1m": m['1m'],
-                "ytd": m['ytd']
+                "Symbol": f"{t} {icon}",
+                "Name": comp_name,
+                "Price": m['Price'],
+                "Change": m['Change']/100,
+                "Trend": m['History']
             })
             
-    df_detail = pd.DataFrame(rows)
+    df_sector = pd.DataFrame(rows)
     
-    if not df_detail.empty:
-        # Sort
-        df_detail = df_detail.sort_values(tf_key, ascending=False)
-        
-        # Filter Top 10
-        if show_top:
-            df_detail = df_detail.head(10)
-            
-        # --- VISUALIZATION: Diverging Bar Chart (Altair) ---
-        # This is the most reliable way to show Green/Red bars in Streamlit
-        st.subheader(f"Top Movers ({tf_label})")
-        
-        chart_data = df_detail.copy()
-        chart_data['Color'] = chart_data[tf_key].apply(lambda x: 'Positive' if x >= 0 else 'Negative')
-        
-        # Base Chart
-        bar_chart = alt.Chart(chart_data).mark_bar().encode(
-            x=alt.X(f"{tf_key}:Q", axis=alt.Axis(format='%'), title="Performance"),
-            y=alt.Y("Symbol:N", sort="-x", title=None),
-            color=alt.Color("Color:N", scale=alt.Scale(domain=['Positive', 'Negative'], range=['#4CAF50', '#FF4B4B']), legend=None),
-            tooltip=["Name", "Price", alt.Tooltip(f"{tf_key}:Q", format=".2%")]
-        ).properties(height=max(400, len(df_detail) * 30))
-        
-        st.altair_chart(bar_chart, use_container_width=True)
-        
-        # --- DATA TABLE: Custom Coloring (No Matplotlib) ---
-        st.subheader("Detailed Data")
-        
-        # Format columns for display (keeping raw numbers for styling)
-        display_df = df_detail.copy()
-        
-        # Custom styling function
-        def style_positive_negative(val):
-            try:
-                v = float(val)
-                if v > 0:
-                    return 'color: #4CAF50; font-weight: bold'
-                elif v < 0:
-                    return 'color: #FF4B4B; font-weight: bold'
-                return ''
-            except:
-                return ''
-
-        # Apply Pandas Styling without matplotlib dependency
-        styler = display_df.style.format({
-            "Price": "${:.2f}",
-            "1d": "{:+.2%}",
-            "1w": "{:+.2%}",
-            "1m": "{:+.2%}",
-            "ytd": "{:+.2%}"
-        }).map(style_positive_negative, subset=["1d", "1w", "1m", "ytd"])
+    if not df_sector.empty:
+        df_sector = df_sector.sort_values("Change", ascending=False)
         
         st.dataframe(
-            styler,
+            df_sector,
             column_config={
-                "Logo": st.column_config.ImageColumn("Logo", width="small"),
-                "Symbol": st.column_config.TextColumn("Symbol", width="small"),
-                "Name": st.column_config.TextColumn("Name", width="large"),
-                "Price": st.column_config.NumberColumn("Price"),
-                # We let the Styler handle the colors for % columns
-                "1d": st.column_config.Column("1 Day"),
-                "1w": st.column_config.Column("1 Week"),
-                "1m": st.column_config.Column("1 Month"),
-                "ytd": st.column_config.Column("YTD"),
+                "Symbol": st.column_config.TextColumn("Ticker", width="small"),
+                "Name": st.column_config.TextColumn("Name", width="medium"),
+                "Price": st.column_config.NumberColumn("Price", format="$%.2f", width="small"),
+                "Change": st.column_config.NumberColumn("Change", format="%.2f%%", width="small"),
+                "Trend": st.column_config.LineChartColumn("Trend", y_min=0, width="small"),
             },
             hide_index=True,
-            use_container_width=True,
-            height=500
+            width="stretch"
         )
     else:
         st.info("No data available.")
