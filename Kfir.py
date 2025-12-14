@@ -8,9 +8,8 @@ import time
 # --- Configuration ---
 st.set_page_config(
     page_title="Theme Tracker Live",
-    page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="collapsed" # Starts closed on mobile (good for focus)
+    initial_sidebar_state="collapsed" 
 )
 
 # Force Dark Theme & Mobile CSS Optimization
@@ -62,22 +61,22 @@ st.markdown("""
 
 # --- Constants & Data ---
 SECTORS = {
-    "📊 Overview": [], 
-    "💾 Semiconductors": ["NVDA", "AMD", "INTC", "TSM", "AVGO", "QCOM", "MU", "TXN"],
-    "🚗 EV & Mobility": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "ON"],
-    "☁️ Cloud & SaaS": ["MSFT", "ADBE", "CRM", "SNOW", "DDOG", "NOW", "WDAY", "ZS"],
-    "🛡️ Cybersecurity": ["PANW", "CRWD", "FTNT", "OKTA", "CYBR", "S", "NET"],
-    "🤖 AI & Robotics": ["ISRG", "PATH", "IRBT", "UPST", "PLTR", "AI", "GOOGL"],
-    "🛒 E-Commerce": ["AMZN", "BABA", "JD", "SHOP", "MELI", "EBAY", "ETSY"],
-    "🧬 Biotech": ["PFE", "MRNA", "BNTX", "LLY", "UNH", "JNJ", "ABBV"],
-    "💳 Fintech": ["PYPL", "AXP", "COIN", "AFRM", "V", "MA", "HOOD"],
-    "⚡ Energy": ["XOM", "CVX", "SHEL", "BP", "COP", "SLB"],
-    "🛍️ Retail": ["WMT", "TGT", "COST", "HD", "LOW", "NKE", "SBUX"],
-    "📺 Media": ["NFLX", "DIS", "CMCSA", "WBD", "PARA", "SPOT"],
-    "✈️ Travel": ["BKNG", "ABNB", "MAR", "DAL", "UAL", "CCL", "RCL"],
-    "⚔️ Defense": ["RTX", "LMT", "BA", "NOC", "GD"],
-    "🎮 Gaming": ["TTWO", "EA", "RBLX", "U", "SONY", "NTDOY"],
-    "🏠 Real Estate": ["PLD", "AMT", "EQIX", "O", "SPG"]
+    "Overview": [], 
+    "Semiconductors": ["NVDA", "AMD", "INTC", "TSM", "AVGO", "QCOM", "MU", "TXN"],
+    "EV & Mobility": ["TSLA", "RIVN", "LCID", "NIO", "XPEV", "GM", "F", "ON"],
+    "Cloud & SaaS": ["MSFT", "ADBE", "CRM", "SNOW", "DDOG", "NOW", "WDAY", "ZS"],
+    "Cybersecurity": ["PANW", "CRWD", "FTNT", "OKTA", "CYBR", "S", "NET"],
+    "AI & Robotics": ["ISRG", "PATH", "IRBT", "UPST", "PLTR", "AI", "GOOGL"],
+    "E-Commerce": ["AMZN", "BABA", "JD", "SHOP", "MELI", "EBAY", "ETSY"],
+    "Biotech": ["PFE", "MRNA", "BNTX", "LLY", "UNH", "JNJ", "ABBV"],
+    "Fintech": ["PYPL", "AXP", "COIN", "AFRM", "V", "MA", "HOOD"],
+    "Energy": ["XOM", "CVX", "SHEL", "BP", "COP", "SLB"],
+    "Retail": ["WMT", "TGT", "COST", "HD", "LOW", "NKE", "SBUX"],
+    "Media": ["NFLX", "DIS", "CMCSA", "WBD", "PARA", "SPOT"],
+    "Travel": ["BKNG", "ABNB", "MAR", "DAL", "UAL", "CCL", "RCL"],
+    "Defense": ["RTX", "LMT", "BA", "NOC", "GD"],
+    "Gaming": ["TTWO", "EA", "RBLX", "U", "SONY", "NTDOY"],
+    "Real Estate": ["PLD", "AMT", "EQIX", "O", "SPG"]
 }
 
 # Mapping Tickers to Company Names
@@ -202,17 +201,17 @@ def format_volume(num):
 
 # Sidebar Navigation (Mobile Drawer)
 with st.sidebar:
-    st.title("⚙️ Controls")
+    st.title("Controls")
     st.markdown("---")
     
     # Controls moved here for mobile space efficiency
-    if st.button("🔄 Refresh Data", type="primary", use_container_width=True):
+    if st.button("Refresh Data", type="primary", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
         
     st.markdown("### Navigation")
-    selected_sector = st.pills("Select Sector", list(SECTORS.keys()), default="📊 Overview")
-    if not selected_sector: selected_sector = "📊 Overview"
+    selected_sector = st.pills("Select Sector", list(SECTORS.keys()), default="Overview")
+    if not selected_sector: selected_sector = "Overview"
     
     st.markdown("### Settings")
     timeframe = st.segmented_control("Timeframe", ["1D", "1W", "1M", "3M", "1Y"], default="1D")
@@ -221,7 +220,7 @@ with st.sidebar:
     st.caption(f"Last updated: {datetime.datetime.now().strftime('%H:%M:%S')}")
 
 # Main Content Area
-st.title("⚡ Theme Tracker")
+st.title("Theme Tracker")
 
 # 1. Market Pulse Ticker (Top Row)
 with st.spinner("Loading Market Pulse..."):
@@ -239,12 +238,12 @@ for i, idx in enumerate(INDICES):
 st.markdown("---")
 
 # 2. Main Content Logic
-if selected_sector == "📊 Overview":
+if selected_sector == "Overview":
     st.subheader("Market Heatmap")
     
     sector_stats = []
     for sec_name, tickers in SECTORS.items():
-        if sec_name == "📊 Overview": continue
+        if sec_name == "Overview": continue
         
         total_change = 0
         count = 0
@@ -290,13 +289,13 @@ else:
         
         m = calculate_metrics(t, live_data, daily_data, timeframe)
         if m:
-            icon = "☾" if m['Extended'] else ""
+            icon = " (Ext)" if m['Extended'] else ""
             comp_name = COMPANY_NAMES.get(t, t)
             # Shorten name for mobile
             if len(comp_name) > 15: comp_name = comp_name[:15] + "..."
             
             rows.append({
-                "Symbol": f"{t} {icon}",
+                "Symbol": f"{t}{icon}",
                 "Name": comp_name,
                 "Price": m['Price'],
                 "Change": m['Change']/100,
@@ -311,7 +310,7 @@ else:
         st.dataframe(
             df_sector,
             column_config={
-                "Symbol": st.column_config.TextColumn("Ticker", width="small"),
+                "Symbol": st.column_config.TextColumn("Ticker", width="small", help="(Ext) = Extended Hours"),
                 "Name": st.column_config.TextColumn("Name", width="medium"),
                 "Price": st.column_config.NumberColumn("Price", format="$%.2f", width="small"),
                 "Change": st.column_config.NumberColumn("Change", format="%.2f%%", width="small"),
